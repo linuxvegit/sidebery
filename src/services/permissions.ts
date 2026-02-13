@@ -1,5 +1,6 @@
 import { Reactivator } from 'src/types'
 import * as Utils from 'src/utils'
+import { IS_CHROME } from 'src/browser-compat'
 
 import * as Permissions from 'src/services/permissions'
 
@@ -43,17 +44,25 @@ export function reactivate(r: Reactivator<PermissionsState>) {
  * Retrieve current permissions
  */
 export async function load(): Promise<void> {
+  const safeContains = async (p: browser.permissions.Permissions): Promise<boolean> => {
+    try {
+      return await browser.permissions.contains(p)
+    } catch {
+      return false
+    }
+  }
+
   const perms = await Promise.all([
-    browser.permissions.contains({ origins: ['<all_urls>'] }),
-    browser.permissions.contains({ permissions: ['webRequest'] }),
-    browser.permissions.contains({ permissions: ['webRequestBlocking'] }),
-    browser.permissions.contains({ permissions: ['proxy'] }),
-    browser.permissions.contains({ permissions: ['tabHide'] }),
-    browser.permissions.contains({ permissions: ['clipboardWrite'] }),
-    browser.permissions.contains({ permissions: ['clipboardRead'] }),
-    browser.permissions.contains({ permissions: ['history'] }),
-    browser.permissions.contains({ permissions: ['bookmarks'] }),
-    browser.permissions.contains({ permissions: ['downloads'] }),
+    safeContains({ origins: ['<all_urls>'] }),
+    safeContains({ permissions: ['webRequest'] }),
+    safeContains({ permissions: ['webRequestBlocking'] }),
+    safeContains({ permissions: ['proxy'] }),
+    safeContains({ permissions: ['tabHide'] }),
+    safeContains({ permissions: ['clipboardWrite'] }),
+    safeContains({ permissions: ['clipboardRead'] }),
+    safeContains({ permissions: ['history'] }),
+    safeContains({ permissions: ['bookmarks'] }),
+    safeContains({ permissions: ['downloads'] }),
   ])
   allUrls = perms[0]
   webRequest = perms[1]
@@ -96,8 +105,17 @@ export async function _request(...perms: RequestablePermission[]): Promise<boole
 
   if (perms.includes('<all_urls>')) {
     origins.push('<all_urls>')
-    permissions.push('webRequest', 'webRequestBlocking', 'proxy')
+    // webRequestBlocking and proxy.onRequest are Firefox-only
+    if (!IS_CHROME) {
+      permissions.push('webRequest', 'webRequestBlocking', 'proxy')
+    }
     Utils.rmFromArray(perms, '<all_urls>')
+  }
+
+  // Filter out Chrome-unsupported permissions
+  if (IS_CHROME) {
+    const unsupportedPerms = ['tabHide', 'webRequestBlocking']
+    perms = perms.filter(p => !unsupportedPerms.includes(p)) as RequestablePermission[]
   }
 
   permissions.push(...perms)

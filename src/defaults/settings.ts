@@ -1,5 +1,7 @@
 import { SettingsState } from '../types/settings'
 
+declare const __CHROMIUM__: boolean
+
 export const DEFAULT_SETTINGS: SettingsState = {
   // General
   nativeScrollbars: true,
@@ -207,7 +209,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   animationSpeed: 'norm',
   theme: 'proton',
   density: 'default',
-  colorScheme: 'ff',
+  colorScheme: __CHROMIUM__ ? 'sys' : 'ff',
 
   // Snapshots
   snapNotify: true,
@@ -345,7 +347,7 @@ export const SETTINGS_OPTIONS = {
   fontSize: ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl'],
   theme: ['proton', 'plain'],
   density: ['compact', 'default', 'loose'],
-  colorScheme: ['dark', 'light', 'sys', 'ff'],
+  colorScheme: __CHROMIUM__ ? ['dark', 'light', 'sys'] as const : ['dark', 'light', 'sys', 'ff'] as const,
   snapIntervalUnit: ['min', 'hr', 'day'],
   snapAutoExportType: ['json', 'md', 'both'],
   snapLimitUnit: ['snap', 'kb', 'day'],

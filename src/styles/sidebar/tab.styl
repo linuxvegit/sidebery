@@ -45,6 +45,7 @@
 
 .Tab
   position: relative
+  box-sizing: border-box
   contain: size layout style
   width: calc(100% - var(--tabs-margin) * 2)
   height: calc(var(--tabs-height) + var(--tabs-margin))
@@ -86,7 +87,7 @@
     padding-left: calc(var(--tabs-indent) * 14)
   &[data-lvl="15"]
     padding-left: calc(var(--tabs-indent) * 15)
-  
+
   &[data-loading="true"]
     cursor: progress
 
@@ -94,7 +95,7 @@
   &[data-selected="true"]:hover
   &[data-selected="true"]:active
     z-index: 15
-  
+
   &[data-edit="true"]
     z-index: 20
     padding-left: 0

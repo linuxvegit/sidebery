@@ -2815,5 +2815,6 @@ export const commonTranslations: Translations = {
   },
 }
 
-if (!window.translations) window.translations = commonTranslations
-else Object.assign(window.translations, commonTranslations)
+const _global = typeof globalThis !== 'undefined' ? globalThis : ({} as any)
+if (!_global.translations) _global.translations = commonTranslations
+else Object.assign(_global.translations, commonTranslations)

@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { NOID } from 'src/defaults'
 import * as IPC from 'src/services/ipc'
 import { InstanceType } from 'src/enums'

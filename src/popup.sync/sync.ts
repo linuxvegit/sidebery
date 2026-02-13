@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { createApp, reactive } from 'vue'
 import Root from './sync.vue'
 import { InstanceType } from 'src/enums'

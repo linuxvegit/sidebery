@@ -7,6 +7,7 @@ import * as Info from 'src/services/info'
 import * as Settings from 'src/services/settings'
 import * as Tabs from './tabs.fg'
 import * as Sidebar from 'src/services/sidebar.fg'
+import { IS_CHROME } from 'src/browser-compat'
 
 import * as Containers from './containers'
 export * from 'src/services/containers'
@@ -64,10 +65,13 @@ export function updateContainers(newContainers?: Record<ID, Container> | null) {
 }
 
 export function setupListeners(): void {
-  if (Info.isSidebar) {
-    browser.contextualIdentities.onCreated.addListener(Containers.onContainerCreated)
+  // contextualIdentities is Firefox-only
+  if (!IS_CHROME) {
+    if (Info.isSidebar) {
+      browser.contextualIdentities.onCreated.addListener(Containers.onContainerCreated)
+    }
+    browser.contextualIdentities.onRemoved.addListener(onContainerRemoved)
   }
-  browser.contextualIdentities.onRemoved.addListener(onContainerRemoved)
   Store.onKeyChange('containers', updateContainers)
 }
 

@@ -2,10 +2,11 @@ const LANG_REG = browser.i18n.getUILanguage().replace('-', '_')
 export const LANG = LANG_REG.slice(0, 2)
 
 // Set dictionary
+const _global = typeof globalThis !== 'undefined' ? globalThis : ({} as any)
 const dict: Record<string, TranslationFn | string> = {}
-if (window.translations) {
-  for (const key of Object.keys(window.translations)) {
-    const prop = window.translations[key]
+if (_global.translations) {
+  for (const key of Object.keys(_global.translations)) {
+    const prop = _global.translations[key]
     dict[key] = prop[LANG_REG] ?? prop[LANG] ?? prop.en
   }
 }

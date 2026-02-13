@@ -927,7 +927,7 @@ declare namespace browser {
       unmodifiable?: 'managed'
       parentId?: ID
       title: string
-      type: TreeNodeType
+      type?: TreeNodeType
       url?: string
     }
 
@@ -1446,5 +1446,124 @@ declare namespace browser {
 
     function getRedirectURL(): string
     function launchWebAuthFlow(details: LaunchWebAuthDetails): Promise<string>
+  }
+
+  /**
+   * Chrome Side Panel API (MV3)
+   * Used as an alternative to Firefox's sidebarAction
+   */
+  namespace sidePanel {
+    interface PanelOptions {
+      path?: string
+      enabled?: boolean
+      tabId?: ID
+    }
+
+    interface OpenOptions {
+      windowId?: ID
+      tabId?: ID
+    }
+
+    function setOptions(options: PanelOptions): Promise<void>
+    function getOptions(options?: { tabId?: ID }): Promise<PanelOptions>
+    function open(options: OpenOptions): Promise<void>
+    function setPanelBehavior(behavior: { openPanelOnActionClick?: boolean }): Promise<void>
+  }
+
+  /**
+   * Chrome Action API (MV3, replaces browserAction)
+   */
+  namespace action {
+    interface PopupDetails {
+      popup: string | null
+      tabId?: ID
+      windowId?: ID
+    }
+
+    function setPopup(details: PopupDetails): void
+    function openPopup(): void
+    function setTitle(details: { title: string; tabId?: ID }): Promise<void>
+    function setIcon(details: { path?: string | Record<string, string>; tabId?: ID }): Promise<void>
+    function setBadgeText(details: { text: string; tabId?: ID }): Promise<void>
+    function setBadgeBackgroundColor(details: {
+      color: string | [number, number, number, number]
+      tabId?: ID
+    }): Promise<void>
+
+    interface OnClickData {
+      modifiers: KbModifiers[]
+      button: number
+    }
+    type ClickListener = (tab: tabs.Tab) => void
+
+    const onClicked: EventTarget<ClickListener>
+  }
+
+  /**
+   * Chrome Tab Groups API (MV3)
+   */
+  namespace tabGroups {
+    type Color = 'grey' | 'blue' | 'red' | 'yellow' | 'green' | 'pink' | 'purple' | 'cyan' | 'orange'
+
+    interface TabGroup {
+      collapsed: boolean
+      color: Color
+      id: ID
+      title?: string
+      windowId: ID
+    }
+
+    interface QueryInfo {
+      collapsed?: boolean
+      color?: Color
+      title?: string
+      windowId?: ID
+    }
+
+    interface UpdateProperties {
+      collapsed?: boolean
+      color?: Color
+      title?: string
+    }
+
+    function get(groupId: ID): Promise<TabGroup>
+    function move(groupId: ID, moveProperties: { index: number; windowId?: ID }): Promise<TabGroup>
+    function query(queryInfo: QueryInfo): Promise<TabGroup[]>
+    function update(groupId: ID, updateProperties: UpdateProperties): Promise<TabGroup>
+
+    type UpdatedListener = (group: TabGroup) => void
+    type CreatedListener = (group: TabGroup) => void
+    type MovedListener = (group: TabGroup) => void
+    type RemovedListener = (group: TabGroup) => void
+
+    const onCreated: EventTarget<CreatedListener>
+    const onMoved: EventTarget<MovedListener>
+    const onRemoved: EventTarget<RemovedListener>
+    const onUpdated: EventTarget<UpdatedListener>
+  }
+
+  /**
+   * Chrome Scripting API (MV3, replaces tabs.executeScript)
+   */
+  namespace scripting {
+    interface ScriptInjection {
+      target: { tabId: ID; frameIds?: number[]; allFrames?: boolean }
+      files?: string[]
+      func?: (...args: any[]) => any
+      args?: any[]
+      injectImmediately?: boolean
+      world?: 'ISOLATED' | 'MAIN'
+    }
+
+    interface CSSInjection {
+      target: { tabId: ID; frameIds?: number[]; allFrames?: boolean }
+      css?: string
+      files?: string[]
+      origin?: 'AUTHOR' | 'USER'
+    }
+
+    function executeScript(injection: ScriptInjection): Promise<any[]>
+    function insertCSS(injection: CSSInjection): Promise<void>
+    function removeCSS(injection: CSSInjection): Promise<void>
   }
 }

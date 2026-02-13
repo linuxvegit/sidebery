@@ -525,10 +525,12 @@ export async function parseDragEvent(
  * Check if string is group url
  */
 export function isGroupUrl(url: string): boolean {
-  return url.startsWith('m') && url.startsWith('/sidebery/group.html', 52)
+  const offset = D.ADDON_HOST.length - 1
+  return url.startsWith(D.ADDON_HOST) && url.startsWith('/sidebery/group.html', offset)
 }
 export function isUrlUrl(url: string): boolean {
-  return url.startsWith('m') && url.startsWith('/sidebery/url.html', 52)
+  const offset = D.ADDON_HOST.length - 1
+  return url.startsWith(D.ADDON_HOST) && url.startsWith('/sidebery/url.html', offset)
 }
 
 export function createGroupUrl(name?: string, conf?: T.GroupConfig): string {
@@ -611,7 +613,7 @@ export function clone<T>(value: T): T {
  */
 export function normalizeUrl(url?: string, title?: string): string | undefined {
   if (!url) return url
-  if (url === 'about:newtab') return undefined
+  if (url === 'about:newtab' || url === 'chrome://newtab/') return undefined
   if (url === 'about:blank') return undefined
   if (url.startsWith('about:reader?url=')) {
     try {
@@ -642,8 +644,8 @@ export function normalizeUrl(url?: string, title?: string): string | undefined {
 export function denormalizeUrl(url?: string): string | undefined {
   if (!url) return url
   // Unavailable URLs
-  else if (url.startsWith('m') && D.URL_PAGE_RE.test(url)) {
-    let data = url.slice(71)
+  else if (url.startsWith(D.ADDON_HOST) && D.URL_PAGE_RE.test(url)) {
+    let data = url.slice(D.URL_URL_LEN + 1)
     try {
       data = decodeURIComponent(data)
       const [url, _] = JSON.parse(data) as string[]
@@ -720,6 +722,7 @@ export async function loadBinAsBase64(url: string): Promise<string | ArrayBuffer
  * < Element - canvas
  **/
 export function createCanvas(width: number, height: number): HTMLCanvasElement {
+  if (typeof document === 'undefined') throw new Error('createCanvas requires a DOM environment')
   // Canvas box
   const canvasBoxEl = document.createElement('div')
   canvasBoxEl.style.position = 'absolute'

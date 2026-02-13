@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { Stored, IPCheckResult } from 'src/types'
 import { InstanceType } from 'src/enums'
 import * as Info from 'src/services/info'

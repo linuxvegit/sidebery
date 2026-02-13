@@ -1,5 +1,5 @@
 import { DataUriImage, Stored } from 'src/types'
-import { FILE_RE, GROUP_PATH, IMG_RE, MUS_RE, SETUP_PATH, URL_PATH, VID_RE } from 'src/defaults'
+import { ADDON_HOST, FILE_RE, GROUP_PATH, IMG_RE, MUS_RE, SETUP_PATH, URL_PATH, VID_RE } from 'src/defaults'
 import * as Utils from 'src/utils'
 import * as Logs from 'src/services/logs'
 
@@ -45,8 +45,9 @@ export async function loadFaviconsData() {
   }
 }
 
-export const SIZE = Math.trunc(16 * window.devicePixelRatio)
-const THRESHOLD_BYTES_DIFF = 150 * window.devicePixelRatio
+const _dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1
+export const SIZE = Math.trunc(16 * _dpr)
+const THRESHOLD_BYTES_DIFF = 150 * _dpr
 
 let favRescaleCanvas: HTMLCanvasElement | undefined
 let favPrescaleCanvas: HTMLCanvasElement | undefined
@@ -119,10 +120,11 @@ export async function resizeFavicon(fav: DataUriImage): Promise<DataUriImage> {
 export function getFavPlaceholder(url?: string): string {
   if (!url) return '#icon_ff'
 
-  if (url.startsWith('m')) {
-    if (url.startsWith(GROUP_PATH, 52)) return '#icon_group'
-    if (url.startsWith(URL_PATH, 52)) return '#icon_link_favicon'
-    if (url.startsWith(SETUP_PATH, 52)) return '#icon_settings'
+  if (url.startsWith(ADDON_HOST)) {
+    const offset = ADDON_HOST.length - 1
+    if (url.startsWith(GROUP_PATH, offset)) return '#icon_group'
+    if (url.startsWith(URL_PATH, offset)) return '#icon_link_favicon'
+    if (url.startsWith(SETUP_PATH, offset)) return '#icon_settings'
   }
 
   if (IMG_RE.test(url)) return '#icon_img'

@@ -16,6 +16,11 @@ const COPY = {
   './src/assets/logo-native-light.svg': `${Utils.ADDON_PATH}/assets/`,
   './src/assets/logo-native.svg': `${Utils.ADDON_PATH}/assets/`,
   './src/assets/logo.svg': `${Utils.ADDON_PATH}/assets/`,
+  './src/assets/logo-16.png': `${Utils.ADDON_PATH}/assets/`,
+  './src/assets/logo-32.png': `${Utils.ADDON_PATH}/assets/`,
+  './src/assets/logo-48.png': `${Utils.ADDON_PATH}/assets/`,
+  './src/assets/logo-96.png': `${Utils.ADDON_PATH}/assets/`,
+  './src/assets/logo-128.png': `${Utils.ADDON_PATH}/assets/`,
   './src/assets/group-page-favicon.svg': `${Utils.ADDON_PATH}/assets/`,
   './src/assets/snapshot-native.svg': `${Utils.ADDON_PATH}/assets/`,
   './src/assets/proxy-native.svg': `${Utils.ADDON_PATH}/assets/`,
@@ -152,43 +157,100 @@ main()
 async function handleManifest(srcPath, dstPath) {
   const forChromium = process.argv.includes('--chromium')
 
-  // Parse and patch manifest for chromium-based browser
+  // For Chromium builds, use the dedicated Chrome MV3 manifest
   if (forChromium) {
-    const srcData = await fs.promises.readFile(srcPath, 'utf-8')
-    const data = JSON.parse(srcData)
+    const chromeSrcPath = srcPath.replace('manifest.json', 'manifest.chrome.json')
+    let srcData
+    try {
+      srcData = await fs.promises.readFile(chromeSrcPath, 'utf-8')
+    } catch {
+      // Fallback: patch the Firefox manifest if Chrome manifest doesn't exist
+      srcData = await fs.promises.readFile(srcPath, 'utf-8')
+      const data = JSON.parse(srcData)
 
-    // Remove unsupported keys
-    delete data.page_action
-    delete data.browser_specific_settings
+      // Convert to MV3
+      data.manifest_version = 3
 
-    // Reset commands
-    for (const key of Object.keys(data.commands)) {
-      const cmd = data.commands[key]
-      if (key === '_execute_sidebar_action') {
-        cmd.suggested_key.windows = cmd.suggested_key.default
-      } else {
-        delete cmd.suggested_key
+      // Remove unsupported keys
+      delete data.page_action
+      delete data.browser_specific_settings
+      delete data.sidebar_action
+
+      // Convert browser_action → action
+      if (data.browser_action) {
+        data.action = {
+          default_icon: data.browser_action.default_icon,
+          default_title: data.browser_action.default_title,
+        }
+        delete data.browser_action
       }
+
+      // Convert background page → service worker
+      if (data.background && data.background.page) {
+        data.background = {
+          service_worker: data.background.page.replace('.html', '.js').replace('bg/', 'bg/'),
+          type: 'module',
+        }
+      }
+
+      // Add side_panel
+      data.side_panel = {
+        default_path: 'sidebar/sidebar.html',
+      }
+
+      // Reset commands
+      for (const key of Object.keys(data.commands)) {
+        const cmd = data.commands[key]
+        if (key === '_execute_sidebar_action') {
+          // Rename to _execute_action for MV3
+          data.commands['_execute_action'] = cmd
+          delete data.commands[key]
+          cmd.suggested_key = { default: cmd.suggested_key?.default || cmd.suggested_key?.windows }
+        } else {
+          delete cmd.suggested_key
+        }
+      }
+
+      // Clean up permissions for Chrome
+      const removePerms = [
+        'contextualIdentities',
+        'menus',
+        'menus.overrideContext',
+        'search',
+        'theme',
+        'identity',
+      ]
+      data.permissions = (data.permissions || []).filter(p => !removePerms.includes(p))
+
+      // Add Chrome-specific permissions
+      if (!data.permissions.includes('contextMenus')) data.permissions.push('contextMenus')
+      if (!data.permissions.includes('sidePanel')) data.permissions.push('sidePanel')
+      if (!data.permissions.includes('scripting')) data.permissions.push('scripting')
+
+      // Move <all_urls> to host_permissions (MV3)
+      const optionalPerms = data.optional_permissions || []
+      const allUrlsIndex = optionalPerms.indexOf('<all_urls>')
+      if (allUrlsIndex !== -1) optionalPerms.splice(allUrlsIndex, 1)
+      data.host_permissions = ['<all_urls>']
+
+      // Remove Firefox-only optional permissions
+      const removeFfOptPerms = ['proxy', 'webRequest', 'webRequestBlocking', 'tabHide']
+      data.optional_permissions = optionalPerms.filter(p => !removeFfOptPerms.includes(p))
+
+      // Add tabGroups as optional permission
+      if (!data.optional_permissions.includes('tabGroups'))
+        data.optional_permissions.push('tabGroups')
+
+      srcData = JSON.stringify(data, null, 2)
     }
 
-    // Clean up permissions
-    const contextualIdentitiesIndex = data.permissions.indexOf('contextualIdentities')
-    if (contextualIdentitiesIndex !== -1) data.permissions.splice(contextualIdentitiesIndex, 1)
-    const menusIndex = data.permissions.indexOf('menus')
-    if (menusIndex !== -1) data.permissions.splice(menusIndex, 1)
-    const menusOverrideContextIndex = data.permissions.indexOf('menus.overrideContext')
-    if (menusOverrideContextIndex !== -1) data.permissions.splice(menusOverrideContextIndex, 1)
-    const tabHideIndex = data.permissions.indexOf('tabHide')
-    if (tabHideIndex !== -1) data.permissions.splice(tabHideIndex, 1)
-    const proxyIndex = data.optional_permissions.indexOf('proxy')
-    if (proxyIndex !== -1) data.optional_permissions.splice(proxyIndex, 1)
-    data.permissions.push('proxy')
-
+    // Ensure we read it correctly (either from Chrome file or generated)
+    const data = JSON.parse(srcData)
     const dstData = JSON.stringify(data)
     await fs.promises.writeFile(dstPath, dstData)
   }
 
-  // Copy
+  // Firefox: just copy manifest as-is
   else {
     return fs.promises.copyFile(srcPath, dstPath)
   }

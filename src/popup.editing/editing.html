@@ -15,8 +15,8 @@
       overflow: clip;
     }
     body {
-      --edit-bg: var(--s-popup-bg, var(--s-frame-bg, -moz-dialog));
-      --edit-fg: var(--s-popup-fg, var(--s-frame-fg, -moz-dialogtext));
+      --edit-bg: var(--s-popup-bg, var(--s-frame-bg, Canvas));
+      --edit-fg: var(--s-popup-fg, var(--s-frame-fg, CanvasText));
       width: 450px;
       background-color: var(--edit-bg);
       padding: 0 12px 0 0;
@@ -54,7 +54,7 @@
 <body id="root" class="root -animate">
   <div
     id="moz_dialog_color_scheme_probe"
-    style="background-color: -moz-dialog; color: -moz-dialogtext; position: absolute; width: 0; height: 0;">
+    style="background-color: Canvas; color: CanvasText; position: absolute; width: 0; height: 0;">
   </div>
   <inject>svg://src/assets/edit.svg#icon_edit</inject>
   <textarea id="text_input" type="text" spellcheck="false">.</textarea>

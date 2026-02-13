@@ -14,6 +14,8 @@ import { translate } from 'src/dict'
 import * as Styles from 'src/services/styles'
 export * from 'src/services/styles'
 
+declare const __CHROMIUM__: boolean
+
 const defaultColorScheme = Styles.getSystemColorScheme()
 
 export let reactive: Styles.StylesState = {
@@ -58,7 +60,10 @@ export function setupListeners(): void {
 }
 
 export async function updateColorScheme(newTheme?: browser.theme.Theme): Promise<void> {
-  if (Settings.state.colorScheme === 'ff') {
+  // On Chrome, treat 'ff' (follow Firefox theme) as 'sys' since there's no Firefox theme API
+  const effectiveScheme = (__CHROMIUM__ && Settings.state.colorScheme === 'ff') ? 'sys' : Settings.state.colorScheme
+
+  if (effectiveScheme === 'ff') {
     if (!newTheme) {
       newTheme = await browser.theme.getCurrent(Windows.id !== NOID ? Windows.id : undefined)
     }
@@ -85,9 +90,15 @@ export async function updateColorScheme(newTheme?: browser.theme.Theme): Promise
     parsedTheme = undefined
   }
 
-  if (Settings.state.colorScheme === 'sys') Styles.updColorScheme(reactive)
-  else if (Settings.state.colorScheme === 'dark') Styles.updColorScheme(reactive, 'dark')
-  else if (Settings.state.colorScheme === 'light') Styles.updColorScheme(reactive, 'light')
+  if (effectiveScheme === 'sys') Styles.updColorScheme(reactive)
+  else if (effectiveScheme === 'dark') Styles.updColorScheme(reactive, 'dark')
+  else if (effectiveScheme === 'light') Styles.updColorScheme(reactive, 'light')
+
+  // On Chrome, apply Nord theme colors and force dark color scheme
+  if (__CHROMIUM__) {
+    applyChromeSystemColors()
+    Styles.updColorScheme(reactive, 'dark')
+  }
 }
 
 export async function loadCustomSidebarCSS(): Promise<void> {
@@ -220,6 +231,45 @@ export function resetThemeSrcVars(): void {
   for (const colorName of Styles.SRC_VARS) {
     rootEl.style.removeProperty(Utils.toCSSVarName('s_' + colorName))
   }
+}
+
+/**
+ * On Chrome, apply Nord theme colors as source variables.
+ * Nord palette: https://www.nordtheme.com/
+ *   Polar Night: #2E3440, #3B4252, #434C5E, #4C566A
+ *   Snow Storm:  #D8DEE9, #E5E9F0, #ECEFF4
+ *   Frost:       #8FBCBB, #88C0D0, #81A1C1, #5E81AC
+ */
+function applyChromeSystemColors(): void {
+  if (typeof document === 'undefined') return
+  const rootEl = document.body
+  if (!rootEl) return
+
+  // Nord Polar Night
+  const nord0 = 'rgb(46, 52, 64)'    // #2E3440 – frame bg
+  const nord1 = 'rgb(59, 66, 82)'    // #3B4252 – toolbar / popup bg
+  const nord2 = 'rgb(67, 76, 94)'    // #434C5E – active element bg
+  const nord3 = 'rgb(76, 86, 106)'   // #4C566A – borders / subtle
+
+  // Nord Snow Storm
+  const nord4 = 'rgb(216, 222, 233)' // #D8DEE9 – primary fg
+  const nord5 = 'rgb(229, 233, 240)' // #E5E9F0
+  const nord6 = 'rgb(236, 239, 244)' // #ECEFF4
+
+  // Nord Frost
+  const nord8 = 'rgb(136, 192, 208)' // #88C0D0 – accent
+
+  rootEl.style.setProperty('--s-frame-bg', nord0)
+  rootEl.style.setProperty('--s-frame-fg', nord4)
+  rootEl.style.setProperty('--s-toolbar-bg', nord1)
+  rootEl.style.setProperty('--s-toolbar-fg', nord4)
+  rootEl.style.setProperty('--s-act-el-bg', nord2)
+  rootEl.style.setProperty('--s-act-el-fg', nord6)
+  rootEl.style.setProperty('--s-popup-bg', nord1)
+  rootEl.style.setProperty('--s-popup-fg', nord4)
+  rootEl.style.setProperty('--s-popup-border', nord3)
+  rootEl.style.setProperty('--s-toolbar-border', nord3)
+  rootEl.style.setProperty('--s-accent', nord8)
 }
 
 export function updateGlobalFontSize(): void {

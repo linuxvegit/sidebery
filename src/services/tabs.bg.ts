@@ -2,6 +2,7 @@ import * as T from 'src/types'
 import { InstanceType } from 'src/enums'
 import * as D from 'src/defaults'
 import * as Utils from 'src/utils'
+import { IS_CHROME } from 'src/browser-compat'
 import * as Windows from 'src/services/windows.bg'
 import * as Containers from 'src/services/containers'
 import * as Store from 'src/services/storage.bg'
@@ -169,9 +170,14 @@ function mutateNativeTabToSideberyTab(nativeTab: T.NativeTab): T.BgTab {
 export function setupListeners(): void {
   browser.tabs.onCreated.addListener(onTabCreated)
   browser.tabs.onRemoved.addListener(onTabRemoved)
-  browser.tabs.onUpdated.addListener(onTabUpdated, {
-    properties: ['pinned', 'title', 'status', 'favIconUrl', 'url', 'hidden', 'discarded'],
-  })
+  // Chrome does not support event filters on tabs.onUpdated
+  if (IS_CHROME) {
+    browser.tabs.onUpdated.addListener(onTabUpdated)
+  } else {
+    browser.tabs.onUpdated.addListener(onTabUpdated, {
+      properties: ['pinned', 'title', 'status', 'favIconUrl', 'url', 'hidden', 'discarded'],
+    })
+  }
   browser.tabs.onActivated.addListener(onTabActivated)
   browser.tabs.onMoved.addListener(onTabMoved)
   browser.tabs.onAttached.addListener(onTabAttached)
@@ -331,7 +337,7 @@ function onTabUpdated(tabId: ID, change: browser.tabs.ChangeInfo): void {
     tab.isGroup &&
     !tab.discarded &&
     (change.title !== undefined || change.url || change.status === 'complete') &&
-    tab.title === D.GROUP_INITIAL_TITLE
+    (tab.title === D.GROUP_INITIAL_TITLE || IS_CHROME)
   ) {
     injectGroupPageScript(tab.windowId, tabId)
   }
@@ -639,6 +645,10 @@ export async function initInternalPageScripts(tabs: T.BgTab[]) {
 }
 
 export async function injectUrlPageScript(winId: ID, tabId: ID) {
+  // Chrome MV3: scripting.executeScript cannot inject into extension pages.
+  // The url page self-initializes via <script> tag and runtime.sendMessage.
+  if (IS_CHROME) return
+
   try {
     browser.tabs
       .executeScript(tabId, {
@@ -697,6 +707,10 @@ export async function getUrlPageInitData(winId: ID, tabId: ID): Promise<UrlPageI
 const injectingGroups = new Set<ID>()
 
 export async function injectGroupPageScript(winId: ID, tabId: ID): Promise<void> {
+  // Chrome MV3: scripting.executeScript cannot inject into extension pages.
+  // The group page self-initializes via <script> tag and runtime.sendMessage.
+  if (IS_CHROME) return
+
   // Already injecting
   if (injectingGroups.has(tabId)) return
   // Already connected, therefore group is initialized

@@ -21,6 +21,10 @@ const SVG_ID_RE = /<svg([^<]*?)id="([^<]*?)"/
 const SVG_TAG_RE = /<svg /
 const NORM_SRC_DIR = path.normalize(SRC_DIR)
 const STATIC_PAGES = ['group.html', 'url.html']
+const IS_CHROMIUM = process.argv.includes('--chromium')
+
+// Pattern to uncomment Chrome script tags: <!-- <script ...></script> -->
+const CHROME_SCRIPT_RE = /<!-- (<script [^>]*><\/script>) -->/g
 
 /**
  * Build
@@ -97,7 +101,13 @@ async function processFile(info) {
     }
   }
 
-  const outData = srcData.replace(SVG_RE, (m, p1) => svgs[p1].content ?? m)
+  let outData = srcData.replace(SVG_RE, (m, p1) => svgs[p1].content ?? m)
+
+  // For Chrome builds, uncomment script tags (Firefox uses injection)
+  if (IS_CHROMIUM) {
+    outData = outData.replace(CHROME_SCRIPT_RE, '$1')
+  }
+
   await fs.promises.mkdir(outputDir, { recursive: true })
   await fs.promises.writeFile(path.join(outputDir, info.file), outData)
 }

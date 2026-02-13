@@ -36,6 +36,7 @@ export interface IPCNodeInfo {
 export type BgActions = {
   cacheTabsData: typeof Tabs.cacheTabsData
   getGroupPageInitData: typeof Tabs.getGroupPageInitData
+  getUrlPageInitData: typeof Tabs.getUrlPageInitData
   tabsApiProxy: typeof Tabs.tabsApiProxy
   getSidebarTabs: typeof Tabs.getSidebarTabs
   detachSidebarTabs: typeof Tabs.detachSidebarTabs

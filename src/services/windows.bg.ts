@@ -1,5 +1,5 @@
 import { BgWindow, ItemInfo, Notification, BgTab, TabCache, TabSessionData } from 'src/types'
-import { DEFAULT_CONTAINER_ID, MOVEID, NOID, PRIVATE_CONTAINER_ID } from 'src/defaults'
+import { DEFAULT_CONTAINER_ID, MOVEID, NOID, PRIVATE_CONTAINER_ID, NEW_TAB_URL } from 'src/defaults'
 import * as Tabs from 'src/services/tabs.bg'
 import * as Info from 'src/services/info'
 import * as Containers from 'src/services/containers'
@@ -153,7 +153,7 @@ export async function createWithTabs(
     }
 
     // Create cache data
-    const cachedData: TabCache = { id: tab.id, url: srcInfo.url ?? 'about:newtab' }
+    const cachedData: TabCache = { id: tab.id, url: srcInfo.url ?? NEW_TAB_URL }
     if (tab.parentId !== undefined && tab.parentId !== NOID) cachedData.parentId = tab.parentId
     if (srcInfo.panelId) cachedData.panelId = srcInfo.panelId
     if (tab.cookieStoreId !== defaultContainerId) cachedData.ctx = tab.cookieStoreId

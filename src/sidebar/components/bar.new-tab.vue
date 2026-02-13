@@ -360,7 +360,7 @@ async function applyBtnRules(btn?: NewTabBtn): Promise<void> {
       else if (info.url === 'about:blank' && tab.title && D.INITIAL_TITLE_RE.test(tab.title)) {
         info.url = 'https://' + tab.title
       }
-      if (info.url === 'about:blank') info.url = 'about:newtab'
+      if (info.url === 'about:blank') info.url = D.NEW_TAB_URL
       toReopen.push(info)
     }
   }

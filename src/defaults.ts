@@ -2,8 +2,20 @@ export * from './defaults/containers'
 export * from './defaults/menu'
 export * from './defaults/panels'
 export * from './defaults/settings'
+import { IS_CHROME } from 'src/browser-compat'
 
 export const PRE_SCROLL = 64
+
+// New tab URL varies by browser
+export const NEW_TAB_URL = IS_CHROME ? 'chrome://newtab/' : 'about:newtab'
+
+/**
+ * Check if a URL is a "new tab" URL in the current browser.
+ */
+export function isNewTabUrl(url: string): boolean {
+  return url === 'about:newtab' || url === 'about:blank' || url === 'chrome://newtab/'
+}
+
 export const ADDON_HOST = /* @__PURE__ */ browser.runtime.getURL('')
 export const SIDEBAR_URL = /* @__PURE__ */ browser.runtime.getURL('/sidebar/sidebar.html')
 export const GROUP_PATH = '/sidebery/group.html'
@@ -161,11 +173,11 @@ export const BOOKMARK_TAB_COLOR: Record<string, string> = {
 }
 export const PROXY_OPTS = ['http', 'https', 'socks4', 'socks', 'direct']
 
-export const BKM_ROOT_ID = 'root________'
-export const BKM_OTHER_ID = 'unfiled_____'
-export const BKM_MENU_ID = 'menu________'
-export const BKM_MOBILE_ID = 'mobile______'
-export const BKM_TLBR_ID = 'toolbar_____'
+export const BKM_ROOT_ID = IS_CHROME ? '0' : 'root________'
+export const BKM_OTHER_ID = IS_CHROME ? '2' : 'unfiled_____'
+export const BKM_MENU_ID = IS_CHROME ? '2' : 'menu________'  // Chrome has no menu folder
+export const BKM_MOBILE_ID = IS_CHROME ? '3' : 'mobile______' // Chrome mobile bookmarks
+export const BKM_TLBR_ID = IS_CHROME ? '1' : 'toolbar_____'
 
 export const PIN_MARK = '📌'
 

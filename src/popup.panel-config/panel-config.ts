@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { createApp, reactive } from 'vue'
 import * as E from 'src/enums'
 import * as Info from 'src/services/info'
@@ -58,6 +61,7 @@ async function main(): Promise<void> {
   Styles.load()
 
   Settings.setupSettingsChangeListener()
+  Store.setupStorageChangeFallback()
   SidebarConfig.setupSidebarConfigListeners()
 
   Permissions.load()

@@ -172,7 +172,7 @@ export async function open(section?: string): Promise<void> {
       activeTab &&
       activeTab.status === 'complete' &&
       !activeTab.pinned &&
-      (activeTab.url === 'about:newtab' || activeTab.url === 'about:blank')
+      (activeTab.url === 'about:newtab' || activeTab.url === 'about:blank' || activeTab.url === 'chrome://newtab/')
     ) {
       await browser.tabs.update(activeTab.id, { url, active: true })
     } else if (Utils.isTabsPanel(activePanel)) {
@@ -331,9 +331,19 @@ export function updateActiveSection(scrollTop: number): void {
  * Get debug details
  */
 export async function getDbgDetails(): Promise<T.DbgInfo> {
+  let browserVersion = 'unknown'
+  try {
+    const browserInfo = await browser.runtime.getBrowserInfo()
+    browserVersion = browserInfo.version
+  } catch {
+    // getBrowserInfo is Firefox-only; for Chrome, extract from user agent
+    const match = navigator.userAgent.match(/Chrome\/(\d+[\d.]*)/)
+    if (match) browserVersion = match[1]
+  }
+
   const dbg: T.DbgInfo = {
     addonVersion: browser.runtime.getManifest().version,
-    firefoxVersion: (await browser.runtime.getBrowserInfo()).version,
+    firefoxVersion: browserVersion,
     settings: Utils.cloneObject(Settings.state),
   }
 
@@ -448,9 +458,10 @@ export async function getDbgDetails(): Promise<T.DbgInfo> {
     const walker = (nodes: T.NativeBkmNode[]) => {
       if (lvl > maxDepth) maxDepth = lvl
       for (const node of nodes) {
-        if (node.type === 'bookmark') bookmarksCount++
-        if (node.type === 'folder') foldersCount++
-        if (node.type === 'separator') separatorsCount++
+        // Chrome doesn't provide 'type' — infer from url/children
+        if (node.type === 'bookmark' || (!node.type && node.url !== undefined)) bookmarksCount++
+        else if (node.type === 'folder' || (!node.type && node.children !== undefined)) foldersCount++
+        else if (node.type === 'separator') separatorsCount++
         if (node.children) {
           lvl++
           walker(node.children)

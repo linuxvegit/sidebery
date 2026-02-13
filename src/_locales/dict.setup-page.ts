@@ -7962,5 +7962,6 @@ Przykłady: "*", "ctrl+$", "ctrl+alt+g"`,
   },
 }
 
-if (!window.translations) window.translations = setupPageTranslations
-else Object.assign(window.translations, setupPageTranslations)
+const _global = typeof globalThis !== 'undefined' ? globalThis : ({} as any)
+if (!_global.translations) _global.translations = setupPageTranslations
+else Object.assign(_global.translations, setupPageTranslations)

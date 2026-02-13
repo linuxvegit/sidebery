@@ -19,22 +19,32 @@ import * as Containers from 'src/services/containers'
 import * as Mouse from 'src/services/mouse.fg'
 import * as Popups from 'src/services/popups.fg'
 import * as Links from 'src/services/links'
+import { IS_CHROME } from 'src/browser-compat'
 
-const EXT_HOST = browser.runtime.getURL('').slice(16)
+const EXT_HOST = new URL(browser.runtime.getURL('')).host + '/'
 const URL_HOST_PATH_RE = /^([a-z0-9-]{1,63}\.)+\w+(:\d+)?\/[A-Za-z0-9-._~:/?#[\]%@!$&'()*+,;=]*$/
-const NEWTAB_URL = browser.extension.inIncognitoContext ? 'about:privatebrowsing' : 'about:newtab'
+const NEWTAB_URL = IS_CHROME
+  ? 'chrome://newtab/'
+  : browser.extension.inIncognitoContext
+    ? 'about:privatebrowsing'
+    : 'about:newtab'
 
 export function setupTabsListeners(): void {
   if (!Sidebar.hasTabs) return
 
   browser.tabs.onCreated.addListener(onTabCreated)
-  browser.tabs.onUpdated.addListener(onTabUpdated, {
-    // prettier-ignore
-    properties: [
-      'audible', 'discarded', 'favIconUrl', 'hidden',
-      'mutedInfo', 'pinned', 'status', 'title', 'url',
-    ],
-  })
+  // Chrome does not support event filters on tabs.onUpdated
+  if (IS_CHROME) {
+    browser.tabs.onUpdated.addListener(onTabUpdated)
+  } else {
+    browser.tabs.onUpdated.addListener(onTabUpdated, {
+      // prettier-ignore
+      properties: [
+        'audible', 'discarded', 'favIconUrl', 'hidden',
+        'mutedInfo', 'pinned', 'status', 'title', 'url',
+      ],
+    })
+  }
   browser.tabs.onRemoved.addListener(onTabRemoved)
   browser.tabs.onMoved.addListener(onTabMoved)
   browser.tabs.onDetached.addListener(onTabDetached)
@@ -452,8 +462,9 @@ async function onTabCreated(nativeTab: NativeTab, attached?: boolean) {
     tab.reactive.unread = tab.unread = true
   }
   if (panel) tab.panelId = panel.id
-  tab.internal = tab.url.startsWith(D.ADDON_HOST)
-  if (tab.internal) tab.isGroup = Utils.isGroupUrl(tab.url)
+  const tabUrl = tab.url || (nativeTab as any).pendingUrl || ''
+  tab.internal = tabUrl.startsWith(D.ADDON_HOST)
+  if (tab.internal) tab.isGroup = Utils.isGroupUrl(tabUrl)
   tab.index = index
   tab.parentId = Settings.state.tabsTree ? (tab.openerTabId ?? D.NOID) : D.NOID
   if (!tab.favIconUrl && !tab.internal && !tab.url.startsWith('a')) {
@@ -827,6 +838,9 @@ function onTabUpdated(tabId: ID, change: browser.tabs.ChangeInfo, nativeTab: Nat
     const isGroup = isInternal && Utils.isGroupUrl(change.url)
     if (tab.isGroup !== isGroup) {
       tab.reactive.isGroup = tab.isGroup = isGroup
+      // On Chrome, isGroup may only become true here (after onTabCreated with url='')
+      // so we need to recalculate the group child count now
+      if (isGroup) Tabs.recalcGroupLen(tabId)
     }
     tab.internal = isInternal
     Tabs.cacheTabsData()
@@ -1166,7 +1180,7 @@ function onTabRemoved(tabId: ID, info: browser.tabs.RemoveInfo, detached?: boole
     !detached &&
     tab.url !== NEWTAB_URL && // Ignore new tabs
     tab.url !== 'about:blank' && // Ignore new tabs
-    (tab.isParent || !tab.url.startsWith('m')) // and non-parent addon pages
+    (tab.isParent || !tab.url.startsWith(D.ADDON_HOST)) // and non-parent addon pages
   ) {
     removedTabInfo = {
       id: tab.id,
@@ -1511,6 +1525,14 @@ function onTabMoved(id: ID, info: browser.tabs.MoveInfo): void {
   }
 
   Sidebar.recalcTabsPanels()
+
+  // When a tab is pinned/unpinned in Chrome, onMoved fires after onUpdated.
+  // At this point srcPanel/dstPanel are undefined (skipped for pinned tabs),
+  // so recalcVisibleTabs must be called explicitly to remove the tab from
+  // the panel's visible list.
+  if (movedTab.pinned) {
+    Sidebar.recalcVisibleTabs()
+  }
 
   let nativeTabsVisibilityUpdateNeeded = false
 

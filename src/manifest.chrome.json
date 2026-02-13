@@ -1,0 +1,127 @@
+{
+  "manifest_version": 3,
+  "author": "mbnuqw",
+  "name": "__MSG_ExtName__",
+  "version": "5.5.0",
+  "default_locale": "en",
+  "description": "__MSG_ExtDesc__",
+  "homepage_url": "https://github.com/mbnuqw/sidebery",
+  "icons": {
+    "48": "./assets/logo-48.png",
+    "96": "./assets/logo-96.png",
+    "128": "./assets/logo-128.png"
+  },
+  "options_ui": {
+    "open_in_tab": true,
+    "page": "page.setup/setup.html"
+  },
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "cookies",
+    "storage",
+    "unlimitedStorage",
+    "sessions",
+    "contextMenus",
+    "search",
+    "sidePanel",
+    "scripting"
+  ],
+  "optional_permissions": [
+    "bookmarks",
+    "clipboardWrite",
+    "clipboardRead",
+    "history",
+    "downloads",
+    "tabGroups"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "side_panel": {
+    "default_path": "sidebar/sidebar.html"
+  },
+  "action": {
+    "default_icon": {
+      "16": "./assets/logo-16.png",
+      "32": "./assets/logo-32.png"
+    },
+    "default_title": "__MSG_ActionTitle__"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+E",
+        "mac": "MacCtrl+E"
+      },
+      "description": "__MSG_KbOpenSidebarPanel__"
+    },
+    "activate": {
+      "description": "__MSG_KbActivate__"
+    },
+    "reset_selection": {
+      "description": "__MSG_KbResetSelection__"
+    },
+    "loop_panels_forwards": {
+      "description": "__MSG_KbLoopPanelsForwards__"
+    },
+    "loop_panels_backwards": {
+      "description": "__MSG_KbLoopPanelsBackwards__"
+    },
+    "next_panel": {
+      "description": "__MSG_KbNextPanel__"
+    },
+    "prev_panel": {
+      "description": "__MSG_KbPrevPanel__"
+    },
+    "new_tab_on_panel": {
+      "description": "__MSG_KbOpenNewTabInCurrPanel__"
+    },
+    "new_tab_in_group": {
+      "description": "__MSG_KbOpenNewTabAfter__"
+    },
+    "new_tab_as_first_child": {
+      "description": "__MSG_KbOpenNewTabAsFirstChild__"
+    },
+    "new_tab_as_last_child": {
+      "description": "__MSG_KbOpenNewTabAsLastChild__"
+    },
+    "rm_tab_on_panel": {
+      "description": "__MSG_KbRm__"
+    },
+    "up": {
+      "description": "__MSG_KbUp__"
+    },
+    "down": {
+      "description": "__MSG_KbDown__"
+    },
+    "up_shift": {
+      "description": "__MSG_KbUpShift__"
+    },
+    "down_shift": {
+      "description": "__MSG_KbDownShift__"
+    },
+    "menu": {
+      "description": "__MSG_KbMenu__"
+    },
+    "fold_branch": {
+      "description": "__MSG_KbFoldBranch__"
+    },
+    "expand_branch": {
+      "description": "__MSG_KbExpandBranch__"
+    },
+    "toggle_branch": {
+      "description": "__MSG_KbToggleBranch__"
+    },
+    "search": {
+      "description": "__MSG_KbSearch__"
+    }
+  },
+  "background": {
+    "service_worker": "bg/background.js",
+    "type": "module"
+  },
+  "omnibox": {
+    "keyword": "="
+  }
+}

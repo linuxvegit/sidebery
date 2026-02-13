@@ -1,5 +1,14 @@
+import * as BrowserCompat from 'src/browser-compat'
 import * as E from 'src/enums'
 import { NOID } from 'src/defaults'
+
+// On Chrome MV3, the service worker has no HTML page to load dict scripts.
+// Import translations explicitly so translate() works in the background.
+import { commonTranslations } from 'src/_locales/dict.common'
+const _global = typeof globalThis !== 'undefined' ? globalThis : ({} as any)
+if (!_global.translations) _global.translations = commonTranslations
+else Object.assign(_global.translations, commonTranslations)
+
 import * as IPC from 'src/services/ipc'
 import * as Logs from 'src/services/logs'
 import * as Settings from 'src/services/settings.bg'
@@ -18,6 +27,9 @@ import * as Sync from 'src/services/sync.bg'
 import * as Omnibox from 'src/services/omnibox.bg'
 import * as Styles from 'src/services/styles.bg'
 
+// Initialize browser compatibility layer (polyfills for Chrome)
+BrowserCompat.init()
+
 void (async function main() {
   Info.setInstanceType(E.InstanceType.bg)
   IPC.setInstanceType(E.InstanceType.bg)
@@ -30,6 +42,7 @@ void (async function main() {
   IPC.registerActions({
     cacheTabsData: Tabs.cacheTabsData,
     getGroupPageInitData: Tabs.getGroupPageInitData,
+    getUrlPageInitData: Tabs.getUrlPageInitData,
     tabsApiProxy: Tabs.tabsApiProxy,
     getSidebarTabs: Tabs.getSidebarTabs,
     detachSidebarTabs: Tabs.detachSidebarTabs,
@@ -117,7 +130,9 @@ void (async function main() {
 
   Logs.info(`Init end: ${performance.now() - ts}ms`)
 
-  window.getSideberyState = () => {
+  // `window` is not available in Chrome MV3 service workers; use globalThis
+  const _global = typeof globalThis !== 'undefined' ? globalThis : (typeof window !== 'undefined' ? window : self)
+  ;(_global as any).getSideberyState = () => {
     return {
       profileId: Info.getProfileId(),
       Windows: {
@@ -134,8 +149,19 @@ void (async function main() {
 function initToolbarButton(): void {
   Menu.createBrowserActionMenu()
 
-  browser.browserAction.onClicked.addListener((_, info): void => {
-    if (info && info.button === 1) browser.runtime.openOptionsPage()
-    else browser.sidebarAction.toggle()
-  })
+  if (BrowserCompat.IS_CHROME) {
+    // Chrome MV3: use action API and open side panel
+    const actionApi = (browser as any).action ?? browser.browserAction
+    actionApi.onClicked.addListener((tab: browser.tabs.Tab): void => {
+      // Open side panel for the tab's window
+      if ((browser as any).sidePanel && tab.windowId) {
+        ;(browser as any).sidePanel.open({ windowId: tab.windowId })
+      }
+    })
+  } else {
+    browser.browserAction.onClicked.addListener((_, info): void => {
+      if (info && info.button === 1) browser.runtime.openOptionsPage()
+      else browser.sidebarAction.toggle()
+    })
+  }
 }

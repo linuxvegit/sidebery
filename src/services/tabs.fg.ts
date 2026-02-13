@@ -145,6 +145,7 @@ export function mutateNativeTabToSideberyTab(nativeTab: T.NativeTab): T.Tab {
       branchColor: null,
       color: null,
       isGroup: tab.isGroup,
+      groupLen: 0,
       preview: false,
     }
   }
@@ -184,6 +185,7 @@ function createReactiveProps(tab: T.Tab): T.ReactiveTabProps {
     branchColor: null,
     color: null,
     isGroup: tab.isGroup,
+    groupLen: 0,
     preview: false,
   }
 
@@ -242,7 +244,7 @@ export async function load(src?: LoadSrc): Promise<void> {
   if (activeTab && !activeTab.pinned) Tabs.scrollToTab(activeTab.id)
 
   const sessionRestoreTabOnly =
-    Tabs.list.length === 1 && Tabs.list[0]?.url === 'about:sessionrestore'
+    Tabs.list.length === 1 && (Tabs.list[0]?.url === 'about:sessionrestore' || Tabs.list[0]?.url === 'chrome://newtab/')
 
   Tabs.updateNativeTabsVisibility()
   if (!sessionRestoreTabOnly) Tabs.cacheTabsData(1000)
@@ -1635,6 +1637,34 @@ export function recalcBranchLen(id: ID): void {
   tab.reactive.branchLen = branchLen
 }
 
+/**
+ * Get count of non-group child tabs in a group tab's branch
+ */
+export function getGroupChildCount(id: ID): number {
+  const tab = Tabs.byId[id]
+  if (!tab) return 0
+
+  let count = 0
+  const tabsLen = Tabs.list.length
+  for (let i = tab.index + 1; i < tabsLen; i++) {
+    const child = Tabs.list[i]
+    if (child.lvl <= tab.lvl) break
+    if (!child.isGroup) count++
+  }
+
+  return count
+}
+
+/**
+ * Recalc count of non-group children for a group tab
+ */
+export function recalcGroupLen(id: ID): void {
+  const tab = Tabs.byId[id]
+  if (!tab || !tab.isGroup) return
+
+  tab.reactive.groupLen = getGroupChildCount(id)
+}
+
 export function autoDiscardFolded(rootTab: T.Tab) {
   if (!Settings.state.discardFolded) return
 
@@ -2049,6 +2079,14 @@ export function updateTabsTree(startIndex = 0, endIndex = -1): void {
   // Calc last folded branch length
   if (foldedBranchLvl > -1 && foldedBranchRoot) {
     foldedBranchRoot.reactive.branchLen = foldedBranchLenCount
+  }
+
+  // Recalc group child counts
+  for (let i = startIndex; i < endIndex; i++) {
+    const tab = Tabs.list[i]
+    if (tab && tab.isGroup) {
+      tab.reactive.groupLen = getGroupChildCount(tab.id)
+    }
   }
 }
 

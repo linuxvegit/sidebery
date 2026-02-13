@@ -2,7 +2,9 @@ import { translate } from 'src/dict'
 import * as SnapshotsBg from 'src/services/snapshots.bg'
 import * as TabsBg from 'src/services/tabs.bg'
 
-export function createBrowserActionMenu() {
+export async function createBrowserActionMenu() {
+  // Remove existing items first to avoid duplicate ID errors (e.g. Chrome service worker restart)
+  await browser.menus.removeAll()
   createSettingsMenu()
   TabsBg.createOpenFromCacheMenu()
 }

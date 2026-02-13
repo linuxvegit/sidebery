@@ -1353,5 +1353,6 @@ export const sidebarTranslations: Translations = {
   },
 }
 
-if (!window.translations) window.translations = sidebarTranslations
-else Object.assign(window.translations, sidebarTranslations)
+const _global = typeof globalThis !== 'undefined' ? globalThis : ({} as any)
+if (!_global.translations) _global.translations = sidebarTranslations
+else Object.assign(_global.translations, sidebarTranslations)

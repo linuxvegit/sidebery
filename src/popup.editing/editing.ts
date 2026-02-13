@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { InstanceType } from 'src/enums'
 import * as IPC from 'src/services/ipc'
 import * as Info from 'src/services/info'

@@ -6,12 +6,21 @@ import * as WebReq from 'src/services/web-req.bg'
 import * as Omnibox from 'src/services/omnibox.bg'
 import * as Settings from 'src/services/settings'
 import * as Logs from 'src/services/logs'
+import { IS_CHROME } from 'src/browser-compat'
 
 import * as Containers from './containers'
 export * from 'src/services/containers'
 
 export async function load(): Promise<void> {
   Logs.info('Containers.bg.load')
+
+  // Chrome doesn't have contextualIdentities — load from storage only
+  if (IS_CHROME) {
+    const storage = await browser.storage.local.get<Stored>('containers')
+    Containers.reactive.byId = storage.containers ?? {}
+    return
+  }
+
   const [ffContainers, storage] = await Promise.all([
     browser.contextualIdentities.query({}),
     browser.storage.local.get<Stored>('containers'),
@@ -90,9 +99,12 @@ export async function create(name: string, color: string, icon: string): Promise
 }
 
 export function setupListeners(): void {
-  browser.contextualIdentities.onCreated.addListener(onContainerCreated)
-  browser.contextualIdentities.onRemoved.addListener(onContainerRemoved)
-  browser.contextualIdentities.onUpdated.addListener(onContainerUpdated)
+  // contextualIdentities listeners are Firefox-only
+  if (!IS_CHROME) {
+    browser.contextualIdentities.onCreated.addListener(onContainerCreated)
+    browser.contextualIdentities.onRemoved.addListener(onContainerRemoved)
+    browser.contextualIdentities.onUpdated.addListener(onContainerUpdated)
+  }
   Store.onKeyChange('containers', updateContainers)
 }
 

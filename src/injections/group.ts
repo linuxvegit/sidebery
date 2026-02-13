@@ -4,6 +4,7 @@ import * as E from 'src/enums'
 import { GroupPageInitData } from 'src/services/tabs.bg'
 import { getFavPlaceholder } from 'src/services/favicons'
 import { NOID, SETTINGS_OPTIONS } from 'src/defaults'
+import { IS_CHROME } from 'src/browser-compat'
 import { applyThemeSrcVars, loadCustomGroupCSS } from './group.styles'
 import * as IPC from 'src/services/ipc'
 import * as Logs from 'src/services/logs'
@@ -31,23 +32,78 @@ function waitDOM(): Promise<void> {
   })
 }
 function waitInitData(): Promise<void> {
+  console.log('[Sidebery Group] waitInitData: IS_CHROME =', IS_CHROME)
   return new Promise((ok, err) => {
-    if (window.sideberyInitData) return ok()
+    if (window.sideberyInitData) { console.log('[Sidebery Group] waitInitData: already have init data'); return ok() }
     window.onSideberyInitDataReady = ok
-    setTimeout(() => {
-      if (window.sideberyInitData) return
-      err('GroupPage: No initial data (sideberyInitData)')
-    }, 60_000)
+
+    // On Chrome, scripting.executeScript cannot inject into extension pages,
+    // so we fetch init data directly via runtime.sendMessage
+    if (IS_CHROME) {
+      console.log('[Sidebery Group] waitInitData: calling fetchInitDataFromBg')
+      fetchInitDataFromBg().then(ok).catch((e) => {
+        console.error('[Sidebery Group] waitInitData: fetchInitDataFromBg failed:', e)
+        // If messaging also fails, wait for potential injection
+        setTimeout(() => {
+          if (window.sideberyInitData) return
+          err('GroupPage: No initial data (sideberyInitData)')
+        }, 60_000)
+      })
+    } else {
+      setTimeout(() => {
+        if (window.sideberyInitData) return
+        err('GroupPage: No initial data (sideberyInitData)')
+      }, 60_000)
+    }
   })
 }
 
+async function fetchInitDataFromBg(): Promise<void> {
+  console.log('[Sidebery Group] fetchInitDataFromBg: starting')
+  let currentTab: browser.tabs.Tab | undefined
+  try {
+    currentTab = await browser.tabs.getCurrent()
+    console.log('[Sidebery Group] fetchInitDataFromBg: currentTab =', currentTab?.id, currentTab?.windowId)
+  } catch (e) {
+    console.error('[Sidebery Group] fetchInitDataFromBg: tabs.getCurrent failed:', e)
+    throw e
+  }
+  if (!currentTab) throw new Error('Cannot get current tab')
+
+  try {
+    const initData = await browser.runtime.sendMessage({
+      dstType: E.InstanceType.bg,
+      action: 'getGroupPageInitData',
+      args: [currentTab.windowId, currentTab.id],
+    })
+    console.log('[Sidebery Group] fetchInitDataFromBg: initData received, keys:', initData ? Object.keys(initData) : 'null')
+    window.sideberyInitData = initData
+  } catch (e) {
+    console.error('[Sidebery Group] fetchInitDataFromBg: sendMessage failed:', e)
+    throw e
+  }
+}
+
 async function main() {
+  console.log('[Sidebery Group] main: starting')
   IPC.setInstanceType(E.InstanceType.group)
   Logs.setInstanceType(E.InstanceType.group)
 
+  // Set title from URL hash immediately on DOM ready, before waiting for init data.
+  // This ensures the tab title is set even if background messaging fails.
+  await waitDOM()
+  const config = parseUrl()
+  const title = config?.title ?? ''
+  console.log('[Sidebery Group] main: title from parseUrl =', JSON.stringify(title), 'hash =', window.location.hash)
+  const titleEl = document.getElementById('title') as HTMLInputElement
+  titleEl.value = title
+  document.title = title || '‎'
+
   try {
-    await Promise.all([waitDOM(), waitInitData()])
+    await waitInitData()
+    console.log('[Sidebery Group] main: init data ready')
   } catch (e) {
+    console.error('[Sidebery Group] main: Initialization error:', e)
     Logs.err('Group page: Initialization error:', e)
     const warnEl = document.getElementById('disconnected_warn')
     if (warnEl) warnEl.textContent = browser.i18n.getMessage('group_disconnected_warn')
@@ -80,14 +136,6 @@ async function main() {
   groupLayout = initData.groupLayout ?? 'grid'
   document.body.setAttribute('data-layout', groupLayout)
   document.body.setAttribute('data-animations', initData.animations ? 'fast' : 'none')
-
-  const config = parseUrl()
-
-  // Set title of group page
-  const title = config?.title ?? ''
-  const titleEl = document.getElementById('title') as HTMLInputElement
-  titleEl.value = title
-  document.title = title || '‎'
 
   if (!initData.groupInfo) {
     Logs.warn('No group info')
@@ -323,7 +371,7 @@ function createNewTabButton() {
     event.stopPropagation()
     event.preventDefault()
     const index = (groupNewTabPos === 'last_child' ? groupTabIndex + groupLen : groupTabIndex) + 1
-    const newTabConf = { id: 0, url: 'about:newtab', active: true }
+    const newTabConf = { id: 0, url: IS_CHROME ? 'chrome://newtab/' : 'about:newtab', active: true }
     const dst: DstPlaceInfo = { windowId: groupWinId, parentId: groupTabId, index }
     IPC.bg('openTabs', [newTabConf], dst)
   })

@@ -1131,7 +1131,7 @@ export async function onDrop(e: DragEvent): Promise<void> {
   if (fromNewTabBar && toTabs) {
     const item = dndItems[0]
     dst.containerId = item.container ?? D.CONTAINER_ID
-    const newTabConf: T.ItemInfo = { id: D.NOID, url: item.url ?? 'about:newtab', active: true }
+    const newTabConf: T.ItemInfo = { id: D.NOID, url: item.url ?? D.NEW_TAB_URL, active: true }
     await Tabs.open([newTabConf], dst)
   }
 

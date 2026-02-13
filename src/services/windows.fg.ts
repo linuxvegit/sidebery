@@ -6,6 +6,7 @@ import * as Logs from 'src/services/logs'
 import * as Settings from 'src/services/settings'
 import * as Sidebar from 'src/services/sidebar.fg'
 import * as Info from 'src/services/info'
+import { IS_CHROME, IS_FIREFOX } from 'src/browser-compat'
 
 export interface WindowsState {
   choosing: WindowChooseOption[] | null
@@ -20,7 +21,9 @@ export interface WindowInfo {
 
 export let id = NOID
 export let uniqWinId = NOID
-export let incognito = browser.extension.inIncognitoContext
+export let incognito = typeof browser !== 'undefined' && browser.extension
+  ? browser.extension.inIncognitoContext
+  : false
 export let focused = false
 export let lastFocused = false
 export let lastFocusedId = NOID
@@ -47,8 +50,8 @@ export async function load(): Promise<void> {
   uniqWinId = winData[1] ?? NOID
 
   // Workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=1660564
-  if (Info.isSidebar && currentWindow.type !== 'normal') {
-    // Sidebar is launched in popup windows.
+  // (Firefox-only: sidebar is launched in popup windows)
+  if (IS_FIREFOX && Info.isSidebar && currentWindow.type !== 'normal') {
     throw `1660564`
   }
 

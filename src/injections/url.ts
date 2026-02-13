@@ -4,6 +4,7 @@ import { UrlPageInitData } from 'src/services/tabs.bg'
 import { toCSSVarName } from 'src/utils'
 import * as Logs from 'src/services/logs'
 import { InstanceType } from 'src/enums'
+import { IS_CHROME } from 'src/browser-compat'
 
 function waitDOM(): Promise<void> {
   return new Promise(res => {
@@ -15,11 +16,34 @@ function waitInitData(): Promise<void> {
   return new Promise((ok, err) => {
     if (window.sideberyInitData) return ok()
     window.onSideberyInitDataReady = ok
-    setTimeout(() => {
-      if (window.sideberyInitData) return
-      err('UrlPage: No initial data (sideberyInitData)')
-    }, 60_000)
+
+    if (IS_CHROME) {
+      fetchInitDataFromBg().then(ok).catch(() => {
+        setTimeout(() => {
+          if (window.sideberyInitData) return
+          err('UrlPage: No initial data (sideberyInitData)')
+        }, 60_000)
+      })
+    } else {
+      setTimeout(() => {
+        if (window.sideberyInitData) return
+        err('UrlPage: No initial data (sideberyInitData)')
+      }, 60_000)
+    }
   })
+}
+
+async function fetchInitDataFromBg(): Promise<void> {
+  const currentTab = await browser.tabs.getCurrent()
+  if (!currentTab) throw new Error('Cannot get current tab')
+
+  const initData = await browser.runtime.sendMessage({
+    dstType: InstanceType.bg,
+    action: 'getUrlPageInitData',
+    args: [currentTab.windowId, currentTab.id],
+  })
+
+  window.sideberyInitData = initData
 }
 
 function applyThemeSrcVars(parsed: ParsedTheme, rootEl?: HTMLElement): void {

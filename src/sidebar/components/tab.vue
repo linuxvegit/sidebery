@@ -47,7 +47,7 @@
       .badge
       .progress-spinner(v-if="Settings.state.animations")
       svg.progress-spinner(v-else): use(href="#icon_hourglass")
-      .child-count(v-if="tab.reactive.folded && tab.reactive.branchLen") {{tab.reactive.branchLen}}
+      .child-count(v-if="(tab.reactive.folded && tab.reactive.branchLen) || (tab.reactive.isGroup && tab.reactive.groupLen)") {{tab.reactive.isGroup ? tab.reactive.groupLen : tab.reactive.branchLen}}
     .audio(
       v-if="tab.reactive.mediaAudible || tab.reactive.mediaMuted || tab.reactive.mediaPaused"
       @mousedown.stop.prevent="onAudioMouseDown($event, tab)"

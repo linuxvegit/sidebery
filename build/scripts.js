@@ -27,7 +27,9 @@ const BUNDLES = {
   'src/popup.tab-preview/tab-preview.ts': true,
 }
 const IMPORT_RE = /(^|\n|\r\n|;)(im|ex)port\s?((?:\n|.)*?)\sfrom\s"(\.\.?|src|vue)(\/.+?)?(\.ts)?"/g
-const ESBUILD_DEFINE = forChromium ? { browser: 'chrome' } : undefined
+const ESBUILD_DEFINE = forChromium
+  ? { browser: 'chrome', __CHROMIUM__: 'true' }
+  : { __CHROMIUM__: 'false' }
 const PROD_ESBUILD_BASE_CONF = {
   tsconfig: 'tsconfig.json',
   charset: 'utf8',
@@ -321,7 +323,80 @@ async function main() {
     await compileAndWatch(files)
     logOk('Scripts: Watching')
   } else {
-    // Splitting allowed code
+    if (forChromium) {
+      // Chrome MV3: Background must be bundled as a single service worker file
+      const buildingBackgroundSW = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: ['src/bg/background.ts'],
+        splitting: false,
+        bundle: true,
+        format: 'esm',
+        outdir: path.join(ADDON_PATH, 'bg'),
+        plugins: [vueComponentsPlugin],
+      })
+      // Other scripts can still use splitting (loaded as regular pages)
+      const buildingSplittedScripts = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: [
+          'src/sidebar/sidebar.ts',
+          'src/page.setup/setup.ts',
+          'src/popup.sync/sync.ts',
+          'src/popup.panel-config/panel-config.ts',
+          'src/popup.search/search.ts',
+          'src/popup.editing/editing.ts',
+          'src/_locales/dict.common.ts',
+          'src/_locales/dict.sidebar.ts',
+          'src/_locales/dict.setup-page.ts',
+        ],
+        splitting: true,
+        outdir: ADDON_PATH,
+        plugins: [vueComponentsPlugin],
+      })
+      // Bundled scripts for injecting
+      const buildingBundledScripts = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: [
+          'src/injections/play-media.ts',
+          'src/injections/pause-media.ts',
+          'src/injections/check-paused-media.ts',
+        ],
+        splitting: false,
+        outdir: path.join(ADDON_PATH, 'injections'),
+      })
+      // Bundled group and url scripts for injection
+      const buildingGroupAndUrlScripts = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: ['src/injections/group.ts', 'src/injections/url.ts'],
+        splitting: false,
+        banner: { js: IIFE_BANNER_WITH_REINJECT_GUARD },
+        footer: { js: IIFE_FOOTER },
+        outdir: path.join(ADDON_PATH, 'injections'),
+      })
+      // Bundled script for preview injection (in-page)
+      const buildingInjectionPreviewScript = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: ['src/injections/tab-preview.ts'],
+        splitting: false,
+        format: 'iife',
+        outdir: path.join(ADDON_PATH, 'injections'),
+      })
+      // Bundled script for preview popup (window)
+      const buildingWindowPreviewScript = esbuild.build({
+        ...PROD_ESBUILD_BASE_CONF,
+        entryPoints: ['src/popup.tab-preview/tab-preview.ts'],
+        splitting: false,
+        outdir: path.join(ADDON_PATH, 'popup.tab-preview'),
+      })
+      await Promise.all([
+        buildingBackgroundSW,
+        buildingSplittedScripts,
+        buildingBundledScripts,
+        buildingGroupAndUrlScripts,
+        buildingInjectionPreviewScript,
+        buildingWindowPreviewScript,
+      ])
+    } else {
+    // Firefox: Splitting allowed code (original build)
     const buildingSplittedScripts = esbuild.build({
       ...PROD_ESBUILD_BASE_CONF,
       entryPoints: [
@@ -383,6 +458,7 @@ async function main() {
       buildingInjectionPreviewScript,
       buildingWindowPreviewScript,
     ])
+    } // end Firefox else block
     logOk('Scripts: Done')
   }
 }

@@ -18,6 +18,9 @@
     "build.ext": "web-ext build --source-dir ./addon -a dist/ -i __tests__",
     "build.run": "node build/webext.run.js",
     "build": "node build/all.js",
+    "build.chrome": "node build/all.js --chromium",
+    "dev.chrome": "node build/all.js --dev --chromium",
+    "build.chrome.run": "node build/webext.run.js --chromium chrome",
     "vite": "node build/all.vite.js",
     "clear.npm": "rm -rf node_modules package-lock.json",
     "clear": "rm -rf addon",
@@ -70,7 +73,8 @@
     "src": "./src"
   },
   "browserslist": [
-    "Firefox >= 140"
+    "Firefox >= 140",
+    "Chrome >= 116"
   ],
   "sideEffects": false
 }

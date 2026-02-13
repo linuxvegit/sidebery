@@ -1,4 +1,5 @@
 import { NOID } from 'src/defaults'
+import { IS_CHROME } from 'src/browser-compat'
 import * as Windows from 'src/services/windows.bg'
 import * as Settings from 'src/services/settings'
 import * as Logs from 'src/services/logs'
@@ -29,9 +30,12 @@ export async function load() {
 export function setupListeners() {
   Styles._setupAutoColorSchemeListener(() => updateWindowStyles(NOID))
 
-  browser.theme.onUpdated.addListener(upd => {
-    updateWindowStyles(upd?.windowId === undefined ? NOID : upd.windowId, upd?.theme)
-  })
+  // browser.theme is Firefox-only; skip on Chrome
+  if (!IS_CHROME && browser.theme?.onUpdated) {
+    browser.theme.onUpdated.addListener(upd => {
+      updateWindowStyles(upd?.windowId === undefined ? NOID : upd.windowId, upd?.theme)
+    })
+  }
 }
 
 const waitingForWinStyles = new Map<ID, ((s: WindowStyles) => void)[]>()
@@ -55,7 +59,7 @@ export async function updateWindowStyles(
   }
 
   if (Settings.state.colorScheme === 'ff') {
-    if (!newTheme) {
+    if (!newTheme && !IS_CHROME && browser.theme?.getCurrent) {
       newTheme = await browser.theme.getCurrent(winId !== NOID ? winId : undefined)
     }
 

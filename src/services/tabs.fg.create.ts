@@ -571,7 +571,7 @@ export async function createTabInNewContainer(): Promise<void> {
   if (!container) return
 
   const dst: DstPlaceInfo = { panelId: panel.id, containerId: container.id }
-  await Tabs.open([{ id: -1, url: 'about:newtab' }], dst)
+  await Tabs.open([{ id: -1, url: D.NEW_TAB_URL }], dst)
 }
 
 export async function reopenTabsInNewContainer(tabIds: ID[]): Promise<void> {

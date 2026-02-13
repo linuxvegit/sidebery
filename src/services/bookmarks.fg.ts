@@ -93,9 +93,14 @@ class BkmNode {
 
   constructor(nativeBkm: T.NativeBkmNode) {
     this.id = nativeBkm.id ?? D.NOID
-    if (nativeBkm.type === 'bookmark') this.type = E.BkmType.Bookmark
-    else if (nativeBkm.type === 'folder') this.type = E.BkmType.Folder
-    else this.type = E.BkmType.Separator
+    // Chrome doesn't provide 'type' on bookmark nodes — infer from url/children
+    if (nativeBkm.type === 'bookmark' || (!nativeBkm.type && nativeBkm.url !== undefined)) {
+      this.type = E.BkmType.Bookmark
+    } else if (nativeBkm.type === 'folder' || (!nativeBkm.type && (nativeBkm.children !== undefined || nativeBkm.url === undefined))) {
+      this.type = E.BkmType.Folder
+    } else {
+      this.type = E.BkmType.Separator
+    }
     this.index = nativeBkm.index ?? -1
     this.parentId = nativeBkm.parentId ?? D.NOID
     this.dateAdded = nativeBkm.dateAdded

@@ -913,6 +913,10 @@ export function createPanelFromConfig(config: T.PanelConfig): T.Panel | null {
   else if (config.type === E.PanelType.sync) panelDefs = D.SYNC_PANEL_STATE
   else return null
 
+  // Fix panel names that were saved as untranslated dict keys
+  if (config.name === 'panel.tabs.title') config.name = translate('panel.tabs.title')
+  if (config.name === 'panel.bookmarks.title') config.name = translate('panel.bookmarks.title')
+
   const panel = Utils.recreateNormalizedObject(config as T.Panel, panelDefs)
   panel.reactive.name = config.name
   panel.reactive.color = config.color

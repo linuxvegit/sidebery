@@ -14,8 +14,8 @@
       margin: 0;
     }
     body {
-      --search-bg: var(--s-popup-bg, var(--s-frame-bg, -moz-dialog));
-      --search-fg: var(--s-popup-fg, var(--s-frame-fg, -moz-dialogtext));
+      --search-bg: var(--s-popup-bg, var(--s-frame-bg, Canvas));
+      --search-fg: var(--s-popup-fg, var(--s-frame-fg, CanvasText));
       background-color: var(--search-bg);
       padding: 0;
       margin: 0;
@@ -49,7 +49,7 @@
 <body id="root" class="root -animate">
   <div
     id="moz_dialog_color_scheme_probe"
-    style="background-color: -moz-dialog; color: -moz-dialogtext; position: absolute; width: 0; height: 0;">
+    style="background-color: Canvas; color: CanvasText; position: absolute; width: 0; height: 0;">
   </div>
   <inject>svg://src/assets/search.svg#icon_search</inject>
   <input id="textInput" type="text" id="hm">

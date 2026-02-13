@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { createApp, reactive, shallowReactive } from 'vue'
 import * as E from 'src/enums'
 import * as Utils from 'src/utils'
@@ -121,6 +124,7 @@ async function main(): Promise<void> {
   Styles.loadCustomSidebarCSS()
   Styles.load()
 
+  Store.setupStorageChangeFallback()
   IPC.connectTo(E.InstanceType.bg)
 
   await Sidebar.loadPanels()
@@ -196,4 +200,6 @@ async function main(): Promise<void> {
     }
   }
 }
-main()
+main().catch(err => {
+  console.error('[Sidebery] Sidebar initialization failed:', err)
+})

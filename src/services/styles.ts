@@ -92,7 +92,7 @@ export function getColorSchemeName(colorScheme?: ColorSchemeVariant): 'dark' | '
 
 export function updColorScheme(state: StylesState, scheme?: 'dark' | 'light'): void {
   if (!scheme) {
-    if (!darkMedia) darkMedia = window.matchMedia(PREF_DARK_MEDIA)
+    if (!darkMedia && typeof window !== 'undefined') darkMedia = window.matchMedia(PREF_DARK_MEDIA)
 
     if (darkMedia.matches) {
       state.frameColorScheme = 'dark'
@@ -114,8 +114,8 @@ export function updColorScheme(state: StylesState, scheme?: 'dark' | 'light'): v
 }
 
 export function _setupAutoColorSchemeListener(cb: () => void): void {
-  if (!darkMedia) darkMedia = window.matchMedia(PREF_DARK_MEDIA)
-  if (!darkMedia.onchange) darkMedia.onchange = () => cb()
+  if (!darkMedia && typeof window !== 'undefined') darkMedia = window.matchMedia(PREF_DARK_MEDIA)
+  if (darkMedia && !darkMedia.onchange) darkMedia.onchange = () => cb()
 }
 
 function getColorSchemeVariant(bg?: RGBA, fg?: RGBA): ColorSchemeVariant | undefined {
@@ -174,6 +174,7 @@ function toColorString(rgba?: RGBA | RGB | string | null, noAlpha?: boolean): st
 }
 
 export function getSystemColorScheme(): 'dark' | 'light' {
+  if (typeof document === 'undefined') return 'dark'
   const probeEl = document.getElementById('moz_dialog_color_scheme_probe')
   if (!probeEl) return 'dark'
 
@@ -193,6 +194,7 @@ export function parseFirefoxTheme(theme: browser.theme.Theme): ParsedTheme {
 
   // Try to use -moz-dialog colors
   moz_dialog_fallback: if (!theme.colors) {
+    if (typeof document === 'undefined') break moz_dialog_fallback
     const probeEl = document.getElementById('moz_dialog_color_scheme_probe')
     if (!probeEl) break moz_dialog_fallback
 
@@ -429,7 +431,7 @@ export function parseFirefoxTheme(theme: browser.theme.Theme): ParsedTheme {
 
   // Fallback to system color scheme
   if (parsed.error || !theme.colors) {
-    if (!darkMedia) darkMedia = window.matchMedia(PREF_DARK_MEDIA)
+    if (!darkMedia && typeof window !== 'undefined') darkMedia = window.matchMedia(PREF_DARK_MEDIA)
     if (darkMedia.matches) parsed.frameVariant = ColorSchemeVariant.Dark
     else parsed.frameVariant = ColorSchemeVariant.Light
     parsed.toolbarVariant = parsed.frameVariant

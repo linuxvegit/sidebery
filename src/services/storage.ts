@@ -22,3 +22,21 @@ export function onKeyChange<K extends keyof Stored, H extends ChangeHandlerG<K>>
 
   changeHandlers[key] = cb as ChangeHandler
 }
+
+/**
+ * Fallback listener using browser.storage.onChanged.
+ * On Chrome MV3, the service worker can be evicted, breaking port-based IPC.
+ * This ensures FG instances still receive storage changes even when IPC is down.
+ * Double-processing is harmless: change handlers compare old vs new values.
+ */
+export function setupStorageChangeFallback(): void {
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== 'local') return
+    for (const [key, change] of Object.entries(changes)) {
+      if (change.newValue !== undefined) {
+        const handler = changeHandlers[key as keyof Stored]
+        if (handler) handler(change.newValue)
+      }
+    }
+  })
+}

@@ -1,3 +1,6 @@
+import * as BrowserCompat from 'src/browser-compat'
+BrowserCompat.init()
+
 import { createApp, reactive } from 'vue'
 import * as E from 'src/enums'
 import * as Settings from 'src/services/settings.fg'
@@ -70,6 +73,7 @@ async function main(): Promise<void> {
   Logs.info(`Init: app.mount: ${performance.now() - ts}ms`)
 
   Settings.setupSettingsChangeListener()
+  Store.setupStorageChangeFallback()
 
   await SidebarConfig.loadSidebarConfig()
   SidebarConfig.setupSidebarConfigListeners()
@@ -86,4 +90,6 @@ async function main(): Promise<void> {
 
   Logs.info(`Init end: ${performance.now() - ts}ms`)
 }
-main()
+main().catch(err => {
+  console.error('[Sidebery] Setup page initialization failed:', err)
+})

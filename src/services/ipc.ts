@@ -910,14 +910,22 @@ async function onPostMsg<T extends InstanceType, A extends keyof Actions>(
  * and sends result back.
  */
 function onSendMsg<T extends InstanceType, A extends keyof Actions>(msg: Message<T, A>) {
+  console.log('[Sidebery BG IPC] onSendMsg received:', msg?.action, 'dstType:', msg?.dstType, 'localType:', _localType)
   // Check if this instance is the correct destination
-  if (msg.dstWinId !== undefined && msg.dstWinId !== _localWinId) return
-  if (msg.dstType !== undefined && msg.dstType !== _localType) return
+  if (msg.dstWinId !== undefined && msg.dstWinId !== _localWinId) {
+    console.log('[Sidebery BG IPC] onSendMsg: winId mismatch, skipping')
+    return
+  }
+  if (msg.dstType !== undefined && msg.dstType !== _localType) {
+    console.log('[Sidebery BG IPC] onSendMsg: dstType mismatch', msg.dstType, '!==', _localType, ', skipping')
+    return
+  }
 
   // Run an action
   let result
   try {
     result = runActionFor(msg)
+    console.log('[Sidebery BG IPC] onSendMsg: action result type:', typeof result, result instanceof Promise ? 'Promise' : '')
   } catch (err) {
     Logs.err(`IPC.onSendMsg: Error on running "${String(msg.action)}" action:`, err)
   }

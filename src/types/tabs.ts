@@ -76,6 +76,7 @@ export interface ReactiveTabProps {
   branchColor: string | null
   customColor: string | null
   isGroup: boolean
+  groupLen: number
   preview: boolean
 }
 
