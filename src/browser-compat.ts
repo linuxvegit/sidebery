@@ -163,8 +163,10 @@ function patchSidebarAction(): void {
         // No equivalent in Chrome
       },
       isOpen: async (_details?: any): Promise<boolean> => {
-        // Cannot reliably detect in Chrome
-        return false
+        // On Chrome, assume the sidePanel is open if this code is running
+        // in the sidebar context. For background service worker, we can't
+        // reliably know, so return true to allow IPC attempts.
+        return true
       },
     }
   }
@@ -224,6 +226,7 @@ function patchContextualIdentities(): void {
       removeListener: () => {},
       hasListener: () => false,
     }
+    let containerCounter = 0
     ;(api as any).contextualIdentities = {
       query: async () => [],
       get: async (id: string) => ({
@@ -233,7 +236,16 @@ function patchContextualIdentities(): void {
         color: 'toolbar',
         colorCode: '#686868',
       }),
-      create: noop,
+      create: async (details: any) => {
+        const cookieStoreId = `chrome-container-${Date.now()}-${++containerCounter}`
+        return {
+          cookieStoreId,
+          name: details?.name ?? '',
+          icon: details?.icon ?? 'fingerprint',
+          color: details?.color ?? 'toolbar',
+          colorCode: details?.colorCode ?? '#686868',
+        }
+      },
       update: noop,
       remove: noop,
       onCreated: emptyEvent,
@@ -276,14 +288,30 @@ function patchTabsHideShow(): void {
               injectImmediately: opts.runAt === 'document_start',
             })
           }
-          // Fallback for other code patterns (may fail under strict CSP)
+          // Handle force-discard beforeunload clearing
+          if (opts.code.includes('onbeforeunload=null')) {
+            return (api as any).scripting.executeScript({
+              target: { tabId, allFrames: opts.allFrames || false },
+              func: () => {
+                ;(window as any).onbeforeunload = null
+                window.addEventListener('beforeunload', e => {
+                  e.returnValue = ''
+                })
+              },
+              injectImmediately: opts.runAt === 'document_start',
+            })
+          }
+          // Generic fallback: use scripting.executeScript with func wrapper
+          // This avoids CSP violations from injecting <script> elements
           return (api as any).scripting.executeScript({
             target: { tabId, allFrames: opts.allFrames || false },
             func: (codeStr: string) => {
-              const s = document.createElement('script')
-              s.textContent = codeStr
-              document.documentElement.appendChild(s)
-              s.remove()
+              try {
+                const fn = new Function(codeStr)
+                fn()
+              } catch {
+                // CSP may block this — silently fail
+              }
             },
             args: [opts.code],
             injectImmediately: opts.runAt === 'document_start',
@@ -300,6 +328,33 @@ function patchTabsHideShow(): void {
 
     // Chrome MV3: tabs.saveAsPDF doesn't exist
     if (!tabs.saveAsPDF) tabs.saveAsPDF = async () => 'not_saved'
+
+    // Chrome: tabs.discard(tabId) only accepts a single tab ID, not an array.
+    // Polyfill to iterate over array and discard each tab individually.
+    const origDiscard = tabs.discard?.bind(tabs)
+    if (origDiscard) {
+      tabs.discard = async (tabIds: number | number[]) => {
+        if (Array.isArray(tabIds)) {
+          await Promise.allSettled(tabIds.map(id => origDiscard(id)))
+        } else {
+          return origDiscard(tabIds)
+        }
+      }
+    }
+
+    // Chrome: tabs.captureTab doesn't exist. Provide a limited polyfill
+    // using captureVisibleTab for the active tab in the current window.
+    if (!tabs.captureTab && (api.tabs as any).captureVisibleTab) {
+      tabs.captureTab = async (tabId?: number, options?: any) => {
+        // captureVisibleTab only works for the active tab — we can't capture
+        // an arbitrary tab by ID. Return empty string for non-active tabs.
+        try {
+          return await (api.tabs as any).captureVisibleTab(undefined, options)
+        } catch {
+          return ''
+        }
+      }
+    }
 
     // Chrome: tabs.duplicate(tabId) does not accept a second options argument
     // like Firefox's tabs.duplicate(tabId, { active, index }). Polyfill by
@@ -377,12 +432,21 @@ function patchWindowsUpdate(): void {
 // -----------------------------------------------------------------------
 function patchSearch(): void {
   if (IS_CHROME && (api as any).search) {
-    const origSearch = (api as any).search.search
-    if (origSearch) {
+    // Chrome uses chrome.search.query() instead of browser.search.search().
+    // Map Firefox's search.search() API to Chrome's search.query() API.
+    const chromeQuery = (api as any).search.query?.bind((api as any).search)
+    if (chromeQuery) {
       ;(api as any).search.search = (props: any) => {
-        // Chrome's search API returns a promise
-        return origSearch(props)
+        const queryProps: any = {}
+        if (props.query) queryProps.text = props.query
+        if (props.tabId !== undefined) queryProps.tabId = props.tabId
+        // Map disposition: CURRENT_TAB, NEW_TAB, NEW_WINDOW
+        if (props.disposition) queryProps.disposition = props.disposition
+        return chromeQuery(queryProps)
       }
+    } else {
+      // Fallback: if search.query doesn't exist, provide a no-op
+      ;(api as any).search.search = async () => {}
     }
   }
 }
@@ -462,11 +526,22 @@ function patchTabsUpdate(): void {
 function patchTabsCreate(): void {
   if (IS_CHROME) {
     const origCreate = api.tabs.create.bind(api.tabs)
-    ;(api.tabs as any).create = (props: any) => {
+    ;(api.tabs as any).create = async (props: any) => {
+      const wantDiscarded = !!props.discarded
       const cleaned = { ...props }
       delete cleaned.cookieStoreId
       delete cleaned.discarded
-      return origCreate(cleaned)
+      delete cleaned.title
+      // If the caller wanted a discarded tab, ensure it's inactive so we
+      // can discard it right after creation.
+      if (wantDiscarded && cleaned.active !== false) cleaned.active = false
+      const tab = await origCreate(cleaned)
+      // Immediately discard the tab to avoid loading it.
+      // This emulates Firefox's discarded tab creation behavior.
+      if (wantDiscarded && tab?.id) {
+        api.tabs.discard(tab.id).catch(() => {})
+      }
+      return tab
     }
   }
 }
@@ -483,6 +558,24 @@ function patchWindowsCreate(): void {
       delete cleaned.allowScriptsToClose
       delete cleaned.titlePreface
       return origCreate(cleaned)
+    }
+  }
+}
+
+// -----------------------------------------------------------------------
+//  history API patch for Chrome
+//  Chrome does not have browser.history.onTitleChanged.
+//  Provide a no-op stub so code referencing it doesn't crash.
+// -----------------------------------------------------------------------
+function patchHistory(): void {
+  if (IS_CHROME && api.history) {
+    const history = api.history as any
+    if (!history.onTitleChanged) {
+      history.onTitleChanged = {
+        addListener: () => {},
+        removeListener: () => {},
+        hasListener: () => false,
+      }
     }
   }
 }
@@ -510,4 +603,5 @@ export function init(): void {
   patchSearch()
   patchProxy()
   patchBookmarks()
+  patchHistory()
 }

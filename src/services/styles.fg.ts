@@ -42,14 +42,18 @@ export async function load(): Promise<void> {
 export function setupListeners(): void {
   Styles._setupAutoColorSchemeListener(() => updateColorScheme())
 
-  browser.theme.onUpdated.addListener(upd => {
-    // Ignore update for different window
-    if (upd && upd.windowId !== undefined && Windows.id !== NOID && upd.windowId !== Windows.id) {
-      return
-    }
+  // browser.theme.onUpdated is Firefox-only; on Chrome it's a no-op stub
+  // but we guard it to be safe in case the stub isn't applied yet
+  if (browser.theme?.onUpdated) {
+    browser.theme.onUpdated.addListener(upd => {
+      // Ignore update for different window
+      if (upd && upd.windowId !== undefined && Windows.id !== NOID && upd.windowId !== Windows.id) {
+        return
+      }
 
-    updateColorScheme(upd?.theme)
-  })
+      updateColorScheme(upd?.theme)
+    })
+  }
 
   if (Info.isSidebar) {
     Store.onKeyChange('sidebarCSS', css => {

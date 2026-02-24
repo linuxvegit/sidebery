@@ -6,6 +6,8 @@ import * as Settings from 'src/services/settings'
 import * as Sidebar from 'src/services/sidebar.fg'
 import * as Containers from 'src/services/containers'
 
+declare const __CHROMIUM__: boolean
+
 type optBlockingResponse = browser.webRequest.BlockingResponse | void
 
 let handledReqId: string | undefined
@@ -37,6 +39,8 @@ function onBeforeRequestHandler(info: browser.webRequest.ReqDetails): optBlockin
 
 export function turnOnBeforeRequestHandler() {
   if (!browser.webRequest) return
+  // Chrome MV3 does not support blocking webRequest listeners
+  if (typeof __CHROMIUM__ !== 'undefined' && __CHROMIUM__) return
   const eventTarget = browser.webRequest.onBeforeRequest
   if (!eventTarget.hasListener(onBeforeRequestHandler)) {
     const filter: browser.webRequest.RequestFilter = {

@@ -1,6 +1,7 @@
 import type { BgTab, IPCheckResult } from 'src/types'
 import * as Utils from 'src/utils'
 import * as E from 'src/enums'
+import { IS_CHROME } from 'src/browser-compat'
 import * as Containers from 'src/services/containers'
 import * as Tabs from 'src/services/tabs.bg'
 import * as IPC from 'src/services/ipc.bg'
@@ -272,7 +273,7 @@ function proxyReqHandler(info: browser.proxy.RequestDetails): browser.proxy.Prox
         else ok = info.url.indexOf(rule as string) !== -1
 
         if (ok) {
-          incHistory['firefox-default'] = info.url
+          incHistory[IS_CHROME ? '0' : 'firefox-default'] = info.url
           return Utils.GLOBAL_QUEUE.add(Tabs.reopenTab, tab, info.url)
         }
       }
@@ -344,6 +345,8 @@ function turnOffReqHandler(): void {
 
 function turnOnAuthHandler(): void {
   if (!browser.proxy || !browser.webRequest) return
+  // Chrome MV3 does not support blocking webRequest listeners
+  if (IS_CHROME) return
   const filter = { urls: ['<all_urls>'] }
   if (!browser.webRequest.onAuthRequired.hasListener(proxyAuthReqHandler)) {
     browser.webRequest.onAuthRequired.addListener(proxyAuthReqHandler, filter, ['blocking'])
@@ -385,6 +388,8 @@ function beforeSendHeadersHandler(info: browser.webRequest.ReqDetails): optBlock
 
 function turnOnBeforeSendHeadersHandler(): void {
   if (!browser.webRequest) return
+  // Chrome MV3 does not support blocking webRequest listeners
+  if (IS_CHROME) return
   const eventTarget = browser.webRequest.onBeforeSendHeaders
   if (!eventTarget.hasListener(beforeSendHeadersHandler)) {
     const filter = { urls: ['<all_urls>'] }

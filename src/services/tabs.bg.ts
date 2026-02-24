@@ -852,9 +852,13 @@ export async function openTabs(items: T.ItemInfo[], dst: T.DstPlaceInfo) {
 
 export async function reopenTab(tab: T.BgTab, url: string, cookieStoreId?: string) {
   let index: number | undefined
-  const checkingIfSidebarOpen = browser.sidebarAction.isOpen({ windowId: tab.windowId }).then(v => {
-    if (!v) throw false
-  })
+  // On Chrome, sidebarAction.isOpen() always returns false (stub).
+  // Skip the check and try IPC directly — if sidebar isn't connected, it will fail gracefully.
+  const checkingIfSidebarOpen = IS_CHROME
+    ? Promise.resolve()
+    : browser.sidebarAction.isOpen({ windowId: tab.windowId }).then(v => {
+        if (!v) throw false
+      })
   const receivingIndex = IPC.sidebar(tab.windowId, 'handleReopening', tab.id, cookieStoreId)
   try {
     const [i] = await Promise.all([receivingIndex, checkingIfSidebarOpen])
