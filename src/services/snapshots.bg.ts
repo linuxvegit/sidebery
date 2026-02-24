@@ -1,6 +1,7 @@
 import { Snapshot, SnapTab, NormalizedSnapshot, SnapExportInfo, Stored } from 'src/types'
 import { RemovingSnapshotResult, SnapStoreMode, PanelType } from 'src/enums'
 import { NOID, CONTAINER_ID, GROUP_URL, DEFAULT_CONTAINER_ID } from 'src/defaults'
+import { IS_CHROME } from 'src/browser-compat'
 import * as Utils from 'src/utils'
 import * as Logs from 'src/services/logs'
 import * as Settings from 'src/services/settings'
@@ -193,8 +194,14 @@ export function exportSnapshot(snapshot: NormalizedSnapshot) {
   const path = getExportPath(expInfo)
 
   if (expInfo.jsonFile) {
+    // Chrome MV3 service workers don't support URL.createObjectURL.
+    // Use a data: URI instead.
+    const jsonStr = JSON.stringify(snapshot)
+    const url = IS_CHROME
+      ? 'data:application/json;base64,' + btoa(unescape(encodeURIComponent(jsonStr)))
+      : URL.createObjectURL(expInfo.jsonFile)
     browser.downloads.download({
-      url: URL.createObjectURL(expInfo.jsonFile),
+      url,
       filename: `${path}.json`,
       conflictAction: 'overwrite',
       saveAs: false,
@@ -202,8 +209,12 @@ export function exportSnapshot(snapshot: NormalizedSnapshot) {
   }
 
   if (expInfo.mdFile) {
+    const mdStr = expInfo.md ?? ''
+    const url = IS_CHROME
+      ? 'data:text/markdown;base64,' + btoa(unescape(encodeURIComponent(mdStr)))
+      : URL.createObjectURL(expInfo.mdFile)
     browser.downloads.download({
-      url: URL.createObjectURL(expInfo.mdFile),
+      url,
       filename: `${path}.md`,
       conflictAction: 'overwrite',
       saveAs: false,
@@ -247,7 +258,25 @@ export async function scheduleSnapshots(): Promise<void> {
   let nextInterval = interval - elapsed
   if (nextInterval < MIN_SNAP_INTERVAL) nextInterval = MIN_SNAP_INTERVAL
 
-  scheduleNextSnapshot(nextInterval)
+  // Chrome MV3: use chrome.alarms API because service worker setTimeout
+  // is unreliable (worker can be killed after ~30s of inactivity).
+  if (IS_CHROME && (browser as any).alarms) {
+    await (browser as any).alarms.clear('sidebery-snapshot').catch(() => {})
+    ;(browser as any).alarms.create('sidebery-snapshot', {
+      delayInMinutes: nextInterval / 60000,
+      periodInMinutes: interval / 60000,
+    })
+    // Listen for alarm (idempotent — removing before adding)
+    if (!(browser as any).alarms.onAlarm._sbListener) {
+      const listener = (alarm: any) => {
+        if (alarm.name === 'sidebery-snapshot') createSnapshot(true)
+      }
+      ;(browser as any).alarms.onAlarm.addListener(listener)
+      ;(browser as any).alarms.onAlarm._sbListener = true
+    }
+  } else {
+    scheduleNextSnapshot(nextInterval)
+  }
 }
 
 let scheduleTimeout: number | undefined
@@ -498,7 +527,7 @@ function limitSnapshots(snapshots: Snapshot[]): Snapshot[] | undefined {
     const snapshot = snapshots[index]
     if (!snapshot) continue
 
-    sizeAccum += new Blob([JSON.stringify(snapshot)]).size
+    sizeAccum += new TextEncoder().encode(JSON.stringify(snapshot)).length
 
     if (unit === 'snap') {
       accum++

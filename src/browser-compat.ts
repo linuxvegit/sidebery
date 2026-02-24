@@ -580,12 +580,41 @@ function patchHistory(): void {
   }
 }
 
+// -----------------------------------------------------------------------
+//  Enable storage.session access from all extension contexts (Chrome)
+//  By default Chrome restricts storage.session to background only.
+// -----------------------------------------------------------------------
+function enableSessionStorageAccess(): void {
+  if (IS_CHROME) {
+    const session = (api.storage as any).session
+    if (session?.setAccessLevel) {
+      session.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }).catch(() => {})
+    }
+  }
+}
+
+/**
+ * Remove session storage entries for a closed tab (Chrome only).
+ * Call this from onTabRemoved to prevent session storage quota exhaustion.
+ */
+export async function cleanupTabSessionData(tabId: ID): Promise<void> {
+  if (!IS_CHROME) return
+  const storage = getSessionStorage()
+  const prefix = `${SESSION_TAB_PREFIX}${tabId}_`
+  try {
+    const all = await storage.get(null)
+    const keysToRemove = Object.keys(all).filter(k => k.startsWith(prefix))
+    if (keysToRemove.length) await storage.remove(keysToRemove)
+  } catch { /* ignore */ }
+}
+
 // =======================================================================
 //  Main init function — call this once at startup in every entry point
 // =======================================================================
 export function init(): void {
   if (!IS_CHROME) return // No patching needed for Firefox
 
+  enableSessionStorageAccess()
   patchMenusApi()
   patchSidebarAction()
   patchBrowserAction()

@@ -3,6 +3,7 @@ import { InstanceType } from 'src/enums'
 import * as D from 'src/defaults'
 import * as Utils from 'src/utils'
 import { IS_CHROME } from 'src/browser-compat'
+import * as BrowserCompat from 'src/browser-compat'
 import * as Windows from 'src/services/windows.bg'
 import * as Containers from 'src/services/containers'
 import * as Store from 'src/services/storage.bg'
@@ -284,6 +285,9 @@ function onTabRemoved(tabId: ID, info: browser.tabs.RemoveInfo): void {
 
   tabs.splice(index, 1)
   delete Tabs.byId[tabId]
+
+  // Clean up Chrome session storage data for the removed tab
+  BrowserCompat.cleanupTabSessionData(tabId)
 
   const len = tabs.length
   for (let i = index, t; i < len; i++) {

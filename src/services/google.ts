@@ -11,8 +11,15 @@ const SCOPES = {
 export let accessToken: string | null = null
 let accessTokenTimeout: number | undefined
 
+declare const __CHROMIUM__: boolean
+
 export function getRedirectURI() {
   const redirectURL = browser.identity.getRedirectURL()
+  // Chrome returns https://<id>.chromiumapp.org/ which is already a valid redirect URL
+  if (typeof __CHROMIUM__ !== 'undefined' && __CHROMIUM__) {
+    return redirectURL
+  }
+  // Firefox uses mozoauth2 loopback redirect
   const redirIdStart = redirectURL.indexOf('/') + 2
   const redirIdEnd = redirectURL.indexOf('.')
   const redirId = redirectURL.slice(redirIdStart, redirIdEnd)

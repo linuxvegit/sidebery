@@ -103,11 +103,24 @@ export async function importKeybindings(keybindings: Record<string, string>) {
 
     // Find conflicting shortcuts
     const toReset = commands.find(k => k.shortcut === shortcut && k.name !== name)
-    if (toReset?.name) await browser.commands.update({ name: toReset.name, shortcut: '' })
+    if (toReset?.name) {
+      // Chrome rejects shortcut: '' — omit the property to reset
+      await browser.commands.update({ name: toReset.name, shortcut: '' }).catch(() => {
+        return browser.commands.reset(toReset.name!)
+      })
+    }
 
     // Set or remove shortcut
-    if (shortcut) waiting.push(browser.commands.update({ name, shortcut }))
-    else waiting.push(browser.commands.update({ name, shortcut: '' }))
+    if (shortcut) {
+      waiting.push(browser.commands.update({ name, shortcut }))
+    } else {
+      // Chrome rejects shortcut: '' — use reset() instead
+      waiting.push(
+        browser.commands.update({ name, shortcut: '' }).catch(() => {
+          return browser.commands.reset(name)
+        })
+      )
+    }
   }
 
   await Promise.allSettled(waiting)

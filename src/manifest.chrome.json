@@ -25,7 +25,9 @@
     "contextMenus",
     "search",
     "sidePanel",
-    "scripting"
+    "scripting",
+    "alarms",
+    "identity"
   ],
   "optional_permissions": [
     "bookmarks",

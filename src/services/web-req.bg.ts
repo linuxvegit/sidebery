@@ -16,7 +16,11 @@ interface IncludeRule {
 
 export let containersProxies: Record<string, browser.proxy.ProxyInfo> = {}
 
-const BG_URL = browser.runtime.getURL('bg/background.html')
+// Chrome MV3 uses a service worker, not a background page. Use the extension
+// origin for request matching instead of a specific HTML file path.
+const BG_URL = IS_CHROME
+  ? browser.runtime.getURL('')
+  : browser.runtime.getURL('bg/background.html')
 
 let handledReqId: string | undefined
 let includeHostsRules: IncludeRule[] = []
@@ -225,7 +229,10 @@ function proxyReqHandler(info: browser.proxy.RequestDetails): browser.proxy.Prox
 
   // Proxify requests for checking ip and other info
   if (!tab && ipCheckCtx && info.type === 'xmlhttprequest') {
-    if (info.originUrl === BG_URL && containersProxies[ipCheckCtx]) {
+    const originMatch = IS_CHROME
+      ? info.originUrl?.startsWith(BG_URL)
+      : info.originUrl === BG_URL
+    if (originMatch && containersProxies[ipCheckCtx]) {
       const ctx = ipCheckCtx
       ipCheckCtx = undefined
       return containersProxies[ctx]
