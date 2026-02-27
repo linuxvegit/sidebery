@@ -16,6 +16,7 @@ import * as Notifications from 'src/services/notifications.fg'
 import * as Selection from 'src/services/selection.fg'
 import * as Favicons from 'src/services/favicons.fg'
 import * as Links from 'src/services/links'
+import { IS_CHROME } from 'src/browser-compat'
 
 import * as Tabs from 'src/services/tabs.fg'
 
@@ -76,6 +77,9 @@ export let activeTabsPerPanel: Record<string, T.ActiveTabsHistory> = {}
 
 export let deferredEventHandling: (() => void)[] = []
 export const clearDeferredEventHandling = () => (deferredEventHandling = [])
+
+// Preserved cache from the last restoreTabsState call (for cascade corruption check)
+let storage_tabsDataCache: T.TabCache[][] | undefined
 
 export let ignoreTabsEvents = false
 export const setIgnoreTabsEventsState = (s: boolean) => (ignoreTabsEvents = s)
@@ -247,7 +251,23 @@ export async function load(src?: LoadSrc): Promise<void> {
     Tabs.list.length === 1 && (Tabs.list[0]?.url === 'about:sessionrestore' || Tabs.list[0]?.url === 'chrome://newtab/')
 
   Tabs.updateNativeTabsVisibility()
-  if (!sessionRestoreTabOnly) Tabs.cacheTabsData(1000)
+  if (!sessionRestoreTabOnly) {
+    // On Chrome, avoid overwriting a good cache (with tree data) with flat
+    // data if the restoration failed to recover the tree structure.
+    if (IS_CHROME && storage_tabsDataCache) {
+      const prevCacheHasTree = storage_tabsDataCache.some(winTabs =>
+        winTabs.some(t => t.parentId !== undefined && t.parentId !== D.NOID)
+      )
+      const currentHasTree = Tabs.list.some(t => !t.pinned && t.parentId !== D.NOID)
+      if (prevCacheHasTree && !currentHasTree) {
+        Logs.warn('Tabs.load: Skipping cache update — previous cache had tree data but current tabs are flat')
+      } else {
+        Tabs.cacheTabsData(1000)
+      }
+    } else {
+      Tabs.cacheTabsData(1000)
+    }
+  }
   Tabs.list.forEach(t => {
     Links.addTab(t)
 
@@ -369,6 +389,9 @@ async function restoreTabsState(src?: LoadSrc, ignoreLockedTabs?: boolean): Prom
 
   Logs.info('Tabs.restoreTabsState: nativeTabs.length:', nativeTabs.length)
 
+  // Save original cache for cascade corruption check in load()
+  storage_tabsDataCache = storage.tabsDataCache
+
   // Check if tabs were locked (sidebery opened this window)
   if (isWindowTabsLocked) {
     Logs.info('Tabs.restoreTabsState: window tabs were locked')
@@ -405,7 +428,20 @@ async function restoreTabsState(src?: LoadSrc, ignoreLockedTabs?: boolean): Prom
       tabsSessionData = []
     }
 
-    tabs = restoreTabsFromSessionData([...nativeTabs], tabsSessionData, lastPanel)
+    // On Chrome, storage.session is cleared on browser restart, so session data
+    // will be empty. Try lenient cache matching as a fallback before giving up.
+    const hasSessionData = tabsSessionData.some(d => d !== undefined)
+    if (IS_CHROME && !hasSessionData && storage.tabsDataCache && !sessionOnly) {
+      Logs.info('Tabs.restoreTabsState: Chrome fallback — trying lenient cache matching')
+      tabsCache = findCachedData(nativeTabs, storage.tabsDataCache, true)
+      if (tabsCache) {
+        tabs = restoreTabsFromCache([...nativeTabs], tabsCache, lastPanel)
+      }
+    }
+
+    if (!tabs) {
+      tabs = restoreTabsFromSessionData([...nativeTabs], tabsSessionData, lastPanel)
+    }
   }
 
   // dbgTabs('Tabs.restoreTabsState: Restored:', tabs)
@@ -654,12 +690,13 @@ function restoreTabsFromSessionData(
  */
 function findCachedData(
   tabs: DeepReadonly<T.NativeTab[]>,
-  data: T.TabCache[][]
+  data: T.TabCache[][],
+  lenient?: boolean
 ): Record<ID, T.TabCache> | undefined {
   let maxEqualityCounter = 1
   let result: Record<ID, T.TabCache> | undefined
 
-  Logs.info('Tabs.findCachedData')
+  Logs.info('Tabs.findCachedData', lenient ? '(lenient)' : '')
   Logs.info('Tabs.findCachedData: cached windows count:', data.length)
 
   if (tabs.length <= 1) {
@@ -672,6 +709,10 @@ function findCachedData(
     if (winTabsCache) data = [winTabsCache]
     Logs.info('Tabs.findCachedData: Window has uniqWinId, matched cache found:', !!winTabsCache)
   }
+
+  // On Chrome, allow some mismatches since storage.session is cleared on
+  // browser restart and the cache is our only source of tree data.
+  const allowedMismatch = lenient ? Math.max(2, Math.ceil(tabs.length * 0.2)) : 0
 
   for (const winTabs of data) {
     let equalityCounter = 0
@@ -719,8 +760,9 @@ function findCachedData(
     const mismatchedLen = tabs.length - equalityCounter
 
     if (
-      (tabs.length <= winTabs.length && mismatchedLen > 0) ||
-      (tabs.length > winTabs.length && mismatchedLen > tabs.length - winTabs.length)
+      (tabs.length <= winTabs.length && mismatchedLen > allowedMismatch) ||
+      (tabs.length > winTabs.length &&
+        mismatchedLen > tabs.length - winTabs.length + allowedMismatch)
     ) {
       Logs.warn('Tabs.findCachedData: mismatched:', mismatchedLen, tabs.length, winTabs.length)
       continue
