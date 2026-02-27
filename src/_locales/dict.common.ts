@@ -1933,6 +1933,20 @@ export const commonTranslations: Translations = {
     zh_TW: '取消釘選分頁',
     ja: 'ピン留め解除',
   },
+  'menu.tab.restore_pinned_url': {
+    en: 'Restore pinned URL',
+    ru: 'Восстановить URL закрепления',
+    zh_CN: '恢复固定时的网址',
+    zh_TW: '恢復釘選時的網址',
+    ja: 'ピン留め時のURLに戻す',
+  },
+  'menu.tab.update_pinned_url': {
+    en: 'Update pinned URL',
+    ru: 'Обновить URL закрепления',
+    zh_CN: '更新固定时的网址',
+    zh_TW: '更新釘選時的網址',
+    ja: 'ピン留めURLを更新',
+  },
   'menu.tab.duplicate': {
     en: 'Duplicate',
     de: 'Duplizieren',

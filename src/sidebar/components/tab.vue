@@ -12,6 +12,7 @@
   :data-paused="tab.reactive.mediaPaused"
   :data-discarded="tab.reactive.discarded"
   :data-updated="tab.reactive.updated"
+  :data-pinned-url-changed="tab.reactive.pinnedUrlChanged"
   :data-lvl="tab.reactive.lvl"
   :data-group="tab.reactive.isGroup"
   :data-parent="tab.reactive.isParent"

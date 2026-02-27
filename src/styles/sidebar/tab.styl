@@ -481,6 +481,17 @@
   background-color: var(--status-err)
 
 // ---
+// -- Pinned URL changed indicator
+// -
+.Tab[data-pinned-url-changed="true"]:not([data-loading="true"]):not([data-updated="true"]) .badge
+  opacity: 1
+  transform: scale(1, 1)
+  background-color: var(--status-warn, #e8a028)
+  width: 7px
+  height: 7px
+  border-radius: 2px
+
+// ---
 // -- Count of descendants
 // -
 .Tab .child-count

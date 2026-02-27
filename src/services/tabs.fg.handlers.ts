@@ -979,6 +979,11 @@ function onTabUpdated(tabId: ID, change: browser.tabs.ChangeInfo, nativeTab: Nat
 
   // Handle unpinned tab
   if (unpinned) {
+    // Clear the remembered pinned URL
+    tab.pinnedUrl = undefined
+    tab.reactive.pinnedUrlChanged = false
+    Tabs.saveTabData(tab.id)
+
     Tabs.cacheTabsData(640)
 
     let panel
@@ -1028,6 +1033,11 @@ function onTabUpdated(tabId: ID, change: browser.tabs.ChangeInfo, nativeTab: Nat
 
   // Handle pinned tab
   if (pinned) {
+    // Remember the URL at the time of pinning
+    tab.pinnedUrl = tab.url
+    tab.reactive.pinnedUrlChanged = false
+    Tabs.saveTabData(tab.id)
+
     Tabs.cacheTabsData(640)
 
     const prevPanelId = tab.prevPanelId
@@ -1112,7 +1122,12 @@ function updTabReactiveProps(change: browser.tabs.ChangeInfo, tab: Tab) {
   if (change.pinned !== undefined) tab.reactive.pinned = change.pinned
   if (change.status !== undefined) tab.reactive.status = Tabs.getStatus(tab)
   if (change.title !== undefined) Tabs.renderTitle(tab)
-  if (change.url !== undefined) tab.reactive.url = change.url
+  if (change.url !== undefined) {
+    tab.reactive.url = change.url
+  }
+  if (change.url !== undefined || change.pinned !== undefined) {
+    tab.reactive.pinnedUrlChanged = !!tab.pinnedUrl && tab.pinned && tab.url !== tab.pinnedUrl
+  }
 }
 
 let recentlyRemovedChildParentMap: Record<ID, ID> | null = null

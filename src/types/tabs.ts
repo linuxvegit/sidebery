@@ -33,6 +33,7 @@ export interface Tab extends NativeTab {
   reopenInContainer?: string
   customTitle?: string
   customColor?: string
+  pinnedUrl?: string
   moving?: boolean
   previewImg?: string
   removing?: boolean
@@ -78,6 +79,7 @@ export interface ReactiveTabProps {
   isGroup: boolean
   groupLen: number
   preview: boolean
+  pinnedUrlChanged: boolean
 }
 
 export interface BgTab extends NativeTab {
@@ -87,6 +89,7 @@ export interface BgTab extends NativeTab {
   folded?: boolean
   customTitle?: string
   customColor?: string
+  pinnedUrl?: string
 
   internal?: boolean
   isGroup?: boolean
@@ -111,6 +114,7 @@ export interface TabCache {
   uniqWinId?: ID /* only for the first tab of window */
   customTitle?: string
   customColor?: string
+  pinnedUrl?: string
 
   index?: number
   isMissedGroup?: boolean
@@ -123,6 +127,7 @@ export interface TabSessionData {
   folded: boolean
   customTitle?: string
   customColor?: string
+  pinnedUrl?: string
 }
 
 export interface ActiveTabsHistory {

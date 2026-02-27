@@ -260,6 +260,38 @@ export const tabsMenuOptions: Record<string, () => MenuOption | MenuOption[] | u
     }
   },
 
+  restorePinnedUrl: () => {
+    const selected = Selection.ids()
+    const firstTab = Tabs.byId[selected[0]]
+    if (!firstTab) return
+    const option: MenuOption = {
+      label: translate('menu.tab.restore_pinned_url'),
+      icon: 'icon_pin',
+      onClick: () => Tabs.restorePinnedUrl(selected),
+    }
+    if (!firstTab.pinned || !firstTab.pinnedUrl || firstTab.pinnedUrl === firstTab.url) {
+      option.inactive = true
+    }
+    if (!Settings.state.ctxMenuRenderInact && option.inactive) return
+    return option
+  },
+
+  updatePinnedUrl: () => {
+    const selected = Selection.ids()
+    const firstTab = Tabs.byId[selected[0]]
+    if (!firstTab) return
+    const option: MenuOption = {
+      label: translate('menu.tab.update_pinned_url'),
+      icon: 'icon_pin',
+      onClick: () => Tabs.updatePinnedUrl(selected),
+    }
+    if (!firstTab.pinned || firstTab.pinnedUrl === firstTab.url) {
+      option.inactive = true
+    }
+    if (!Settings.state.ctxMenuRenderInact && option.inactive) return
+    return option
+  },
+
   reload: () => {
     return {
       label: translate('menu.tab.reload'),

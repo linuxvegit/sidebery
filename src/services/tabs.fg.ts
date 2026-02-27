@@ -151,6 +151,7 @@ export function mutateNativeTabToSideberyTab(nativeTab: T.NativeTab): T.Tab {
       isGroup: tab.isGroup,
       groupLen: 0,
       preview: false,
+      pinnedUrlChanged: !!tab.pinnedUrl && tab.pinned && tab.url !== tab.pinnedUrl,
     }
   }
 
@@ -191,6 +192,7 @@ function createReactiveProps(tab: T.Tab): T.ReactiveTabProps {
     isGroup: tab.isGroup,
     groupLen: 0,
     preview: false,
+    pinnedUrlChanged: !!tab.pinnedUrl && tab.pinned && tab.url !== tab.pinnedUrl,
   }
 
   if (reactFn) return reactFn(rProps)
@@ -252,15 +254,19 @@ export async function load(src?: LoadSrc): Promise<void> {
 
   Tabs.updateNativeTabsVisibility()
   if (!sessionRestoreTabOnly) {
-    // On Chrome, avoid overwriting a good cache (with tree data) with flat
-    // data if the restoration failed to recover the tree structure.
+    // On Chrome, avoid overwriting a good cache (with tree data or pinnedUrl)
+    // with data that lost this information during restoration.
     if (IS_CHROME && storage_tabsDataCache) {
       const prevCacheHasTree = storage_tabsDataCache.some(winTabs =>
         winTabs.some(t => t.parentId !== undefined && t.parentId !== D.NOID)
       )
       const currentHasTree = Tabs.list.some(t => !t.pinned && t.parentId !== D.NOID)
-      if (prevCacheHasTree && !currentHasTree) {
-        Logs.warn('Tabs.load: Skipping cache update — previous cache had tree data but current tabs are flat')
+      const prevCacheHasPinnedUrl = storage_tabsDataCache.some(winTabs =>
+        winTabs.some(t => t.pin && !!t.pinnedUrl)
+      )
+      const currentHasPinnedUrl = Tabs.list.some(t => t.pinned && !!t.pinnedUrl)
+      if ((prevCacheHasTree && !currentHasTree) || (prevCacheHasPinnedUrl && !currentHasPinnedUrl)) {
+        Logs.warn('Tabs.load: Skipping cache update — previous cache had tree/pinnedUrl data that would be lost')
       } else {
         Tabs.cacheTabsData(1000)
       }
@@ -444,6 +450,23 @@ async function restoreTabsState(src?: LoadSrc, ignoreLockedTabs?: boolean): Prom
     }
   }
 
+  // On Chrome, recover pinnedUrl from cache for pinned tabs that lost it.
+  // This handles cases where cache matching failed (single tab, URL mismatch, etc.)
+  // but the cache still contains valid pinnedUrl data.
+  if (IS_CHROME && storage.tabsDataCache) {
+    for (const tab of tabs) {
+      if (tab.pinned && !tab.pinnedUrl) {
+        for (const winTabs of storage.tabsDataCache) {
+          const cached = winTabs.find(c => c.pin && c.pinnedUrl && c.url === tab.url)
+          if (cached) {
+            tab.pinnedUrl = cached.pinnedUrl
+            break
+          }
+        }
+      }
+    }
+  }
+
   // dbgTabs('Tabs.restoreTabsState: Restored:', tabs)
 
   tabs = await restoreTabPanelsContent(tabs)
@@ -571,6 +594,7 @@ function restoreTab(
     tab.reactive.folded = tab.folded = !!props.folded
     if (props.customTitle) tab.customTitle = props.customTitle
     if (props.customColor) tab.reactive.customColor = tab.customColor = props.customColor
+    if (props.pinnedUrl) tab.pinnedUrl = props.pinnedUrl
   } else {
     Logs.warn(`Tabs.restoreTab: no props for: "${tab.id} i${tab.index} url${tab.url}"`)
   }
@@ -803,6 +827,7 @@ export function cacheTabsData(delay = 300): void {
       if (tab.cookieStoreId !== D.CONTAINER_ID) info.ctx = tab.cookieStoreId
       if (tab.customTitle) info.customTitle = tab.customTitle
       if (tab.customColor) info.customColor = tab.customColor
+      if (tab.pinnedUrl) info.pinnedUrl = tab.pinnedUrl
       data.push(info)
     }
 
@@ -860,7 +885,8 @@ function _saveTabData(tabId: ID, forced?: boolean): void {
       data.folded === tab.folded &&
       data.panelId === tab.panelId &&
       data.customColor === tab.customColor &&
-      data.customTitle === tab.customTitle
+      data.customTitle === tab.customTitle &&
+      data.pinnedUrl === tab.pinnedUrl
     ) {
       return
     }
@@ -883,6 +909,8 @@ function _saveTabData(tabId: ID, forced?: boolean): void {
   else delete data.customTitle
   if (tab.customColor) data.customColor = tab.customColor
   else delete data.customColor
+  if (tab.pinnedUrl) data.pinnedUrl = tab.pinnedUrl
+  else delete data.pinnedUrl
 
   // Logs.info('Tabs.saveTabData: Saving...', tabId, { ...data })
   browser.sessions.setTabValue(tabId, 'data', data).catch(err => {
@@ -1311,6 +1339,34 @@ export function repinTabs(tabIds: ID[]): void {
       Logs.err('Tabs.repinTabs: Cannot repin tab:', err)
     })
   }
+}
+
+/**
+ * Restore pinned tabs to their remembered URLs (the URL when they were pinned).
+ */
+export function restorePinnedUrl(tabIds: ID[]): void {
+  for (const tabId of tabIds) {
+    const tab = Tabs.byId[tabId]
+    if (!tab || !tab.pinned || !tab.pinnedUrl) continue
+    browser.tabs.update(tabId, { url: tab.pinnedUrl }).catch(err => {
+      Logs.err('Tabs.restorePinnedUrl: Cannot update tab URL:', err)
+    })
+    // The indicator will be updated when onTabUpdated fires with the new URL
+  }
+}
+
+/**
+ * Update the remembered pinned URL to the current URL.
+ */
+export function updatePinnedUrl(tabIds: ID[]): void {
+  for (const tabId of tabIds) {
+    const tab = Tabs.byId[tabId]
+    if (!tab || !tab.pinned) continue
+    tab.pinnedUrl = tab.url
+    tab.reactive.pinnedUrlChanged = false
+    Tabs.saveTabData(tabId)
+  }
+  Tabs.cacheTabsData()
 }
 
 /**

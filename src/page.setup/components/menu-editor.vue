@@ -101,7 +101,7 @@
     .ctrls
       .btn(@click="resetBookmarksMenu") {{translate('menu.editor.reset')}}
       .btn(@click="createSeparator('bookmarks')") {{translate('menu.editor.create_separator')}}
-  
+
   section(ref="menuEditorBookmarksPanelEl" @click.stop @wheel="moveSelected($event, 'bookmarksPanel')")
     h2 {{translate('menu.editor.bookmarks_panel_title')}}
 
@@ -160,6 +160,8 @@ interface MenuEditorGroup {
 const TABS_MENU_OPTS: Record<string, string> = {
   undoRmTab: 'menu.tab.undo',
   pin: 'menu.tab.pin',
+  restorePinnedUrl: 'menu.tab.restore_pinned_url',
+  updatePinnedUrl: 'menu.tab.update_pinned_url',
   reload: 'menu.tab.reload',
   bookmark: 'menu.tab.bookmark',
   moveToNewWin: 'menu.tab.move_to_new_window',
