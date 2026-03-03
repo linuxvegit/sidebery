@@ -261,11 +261,37 @@ export async function load(src?: LoadSrc): Promise<void> {
         winTabs.some(t => t.parentId !== undefined && t.parentId !== D.NOID)
       )
       const currentHasTree = Tabs.list.some(t => !t.pinned && t.parentId !== D.NOID)
-      const prevCacheHasPinnedUrl = storage_tabsDataCache.some(winTabs =>
-        winTabs.some(t => t.pin && !!t.pinnedUrl)
+      const prevCachePinnedUrlCount = storage_tabsDataCache.reduce(
+        (n, winTabs) => n + winTabs.filter(t => t.pin && !!t.pinnedUrl).length, 0
       )
-      const currentHasPinnedUrl = Tabs.list.some(t => t.pinned && !!t.pinnedUrl)
-      if ((prevCacheHasTree && !currentHasTree) || (prevCacheHasPinnedUrl && !currentHasPinnedUrl)) {
+      const currentPinnedUrlCount = Tabs.list.filter(t => t.pinned && !!t.pinnedUrl).length
+
+      // If some pinnedUrls were lost during restoration, try to recover them
+      // from the old cache before deciding whether to save.
+      if (prevCachePinnedUrlCount > 0 && currentPinnedUrlCount < prevCachePinnedUrlCount) {
+        Logs.warn(
+          'Tabs.load: Recovering lost pinnedUrl from old cache:',
+          currentPinnedUrlCount, '/', prevCachePinnedUrlCount
+        )
+        for (const tab of Tabs.list) {
+          if (tab.pinned && !tab.pinnedUrl) {
+            for (const winTabs of storage_tabsDataCache) {
+              const cached = winTabs.find(c => c.pin && c.pinnedUrl && c.url === tab.url)
+              if (cached) {
+                tab.pinnedUrl = cached.pinnedUrl
+                tab.reactive.pinnedUrlChanged = tab.url !== cached.pinnedUrl
+                break
+              }
+            }
+          }
+        }
+      }
+
+      const finalPinnedUrlCount = Tabs.list.filter(t => t.pinned && !!t.pinnedUrl).length
+      if (
+        (prevCacheHasTree && !currentHasTree) ||
+        (prevCachePinnedUrlCount > 0 && finalPinnedUrlCount < prevCachePinnedUrlCount)
+      ) {
         Logs.warn('Tabs.load: Skipping cache update — previous cache had tree/pinnedUrl data that would be lost')
       } else {
         Tabs.cacheTabsData(1000)
@@ -454,6 +480,7 @@ async function restoreTabsState(src?: LoadSrc, ignoreLockedTabs?: boolean): Prom
   // This handles cases where cache matching failed (single tab, URL mismatch, etc.)
   // but the cache still contains valid pinnedUrl data.
   if (IS_CHROME && storage.tabsDataCache) {
+    // Phase 1: Try matching by current URL
     for (const tab of tabs) {
       if (tab.pinned && !tab.pinnedUrl) {
         for (const winTabs of storage.tabsDataCache) {
@@ -463,6 +490,27 @@ async function restoreTabsState(src?: LoadSrc, ignoreLockedTabs?: boolean): Prom
             break
           }
         }
+      }
+    }
+
+    // Phase 2: For remaining unmatched pinned tabs, try positional matching.
+    // This handles cases where tab URLs changed during restart (redirects, loading, etc.)
+    const unmatchedPinned = tabs.filter(t => t.pinned && !t.pinnedUrl)
+    if (unmatchedPinned.length > 0) {
+      const matchedPinnedUrls = new Set(
+        tabs.filter(t => t.pinned && t.pinnedUrl).map(t => t.pinnedUrl)
+      )
+      for (const winTabs of storage.tabsDataCache) {
+        const cachedPinned = winTabs.filter(
+          c => c.pin && c.pinnedUrl && !matchedPinnedUrls.has(c.pinnedUrl)
+        )
+        // Match by position among the remaining unmatched entries
+        for (let i = 0; i < unmatchedPinned.length && i < cachedPinned.length; i++) {
+          unmatchedPinned[i].pinnedUrl = cachedPinned[i].pinnedUrl
+          unmatchedPinned[i].reactive.pinnedUrlChanged =
+            unmatchedPinned[i].url !== cachedPinned[i].pinnedUrl
+        }
+        if (unmatchedPinned.every(t => t.pinnedUrl)) break
       }
     }
   }
